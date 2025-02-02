@@ -12,8 +12,8 @@ where:
     - catm: atmospheric concentration of caron (ppm)
 """
 
-from land_component.boxes.abstract_box import AbstractLandBox
-from land_component.boxes.utils import general_calibration_fun
+from carbon_cycle_model.land_component.boxes.abstract_box import AbstractLandBox
+from carbon_cycle_model.land_component.boxes.utils import general_calibration_fun
 
 # Defaults
 # TODO: GET RIGHT DEFAULTS

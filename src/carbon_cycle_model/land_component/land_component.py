@@ -8,16 +8,16 @@ quantifies the carbon concentration in the atmosphere.
 
 import numpy as np
 
-from land_component.boxes.vegetation_box import VegetationBox
-from land_component.boxes.soil_box import SoilBox
-import constants
+from carbon_cycle_model.land_component.boxes.vegetation_box import VegetationBox
+from carbon_cycle_model.land_component.boxes.soil_box import SoilBox
+from carbon_cycle_model.constants import *
 
 
 CATM0_DEFAULT = 100
-DT_DEFAULT = 0.1 + constants.PPM2GT
+DT_DEFAULT = 0.1 + PPM2GT
 
 
-class LandCarbonCycle():
+class LandCarbonCycle:
     """
     Class implementing the land component of the carbon cycle.
     """
