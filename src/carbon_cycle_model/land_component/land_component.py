@@ -10,11 +10,7 @@ import numpy as np
 
 from carbon_cycle_model.land_component.boxes.vegetation_box import VegetationBox
 from carbon_cycle_model.land_component.boxes.soil_box import SoilBox
-from carbon_cycle_model.constants import *
-
-
-CATM0_DEFAULT = 100
-DT_DEFAULT = 0.1 + PPM2GT
+from carbon_cycle_model import defaults
 
 
 class LandCarbonCycle:
@@ -22,32 +18,46 @@ class LandCarbonCycle:
     Class implementing the land component of the carbon cycle.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, dt, num_steps, **kwargs):
         # Create and initialise boxes
         self.veg_box = VegetationBox(**kwargs)
         self.soil_box = SoilBox(**kwargs)
 
-        self.catm0 = kwargs.get("catm0", CATM0_DEFAULT)
-        self.catm = kwargs.get("catm", CATM0_DEFAULT)
-        self.dt = kwargs.get("dt", DT_DEFAULT)
-        self.num_steps = kwargs["num_steps"]
+        # pre-industrial value for atmos CO2 conc. Units: ppm.
+        self.catm0 = kwargs.get("catm0", defaults.CATM0_DEFAULT)
+        # Initital value for atmos CO2 conc. Units: ppm
+        self.catm = kwargs.get("catm", defaults.CATM0_DEFAULT)
+        # Timestep. Unit: years
+        self.dt = dt
+        # Number of timesteps in the simulation. Unit: dimensionless.
+        # (needed to avoid dynamic allocation, although this could change in the future)
+        self.num_steps = num_steps
 
         # Create arrays to store results
-        self.cveg = np.zeros(kwargs["num_steps"])
-        self.csoil = np.zeros(kwargs["num_steps"])
-        self.gpp = np.zeros(kwargs["num_steps"])
-        self.npp = np.zeros(kwargs["num_steps"])
-        self.vres = np.zeros(kwargs["num_steps"])
-        self.lit = np.zeros(kwargs["num_steps"])
-        self.sres = np.zeros(kwargs["num_steps"])
-        self.fcva = np.zeros(kwargs["num_steps"])
-        self.fcsa = np.zeros(kwargs["num_steps"])
-        self.fcvs = np.zeros(kwargs["num_steps"])
+        self.cveg = np.zeros(num_steps)
+        self.csoil = np.zeros(num_steps)
+        self.gpp = np.zeros(num_steps)
+        self.npp = np.zeros(num_steps)
+        self.vres = np.zeros(num_steps)
+        self.lit = np.zeros(num_steps)
+        self.sres = np.zeros(num_steps)
+        self.fcva = np.zeros(num_steps)
+        self.fcsa = np.zeros(num_steps)
+        self.fcvs = np.zeros(num_steps)
+
+        # Populate first values
+        self.cveg[0] = kwargs.get("cveg0", defaults.CVEG0_DEFAULT)
+        self.csoil[0] = kwargs.get("csoil0", defaults.CSOIL0_DEFAULT)
+        self.gpp[0] = kwargs.get("gpp0", defaults.GPP0_DEFAULT)
+        self.npp[0] = kwargs.get("npp0", defaults.NPP0_DEFAULT)
+        self.vres[0] = kwargs.get("vres0", defaults.VRES0_DEFAULT)
+        self.lit[0] = kwargs.get("lit0", defaults.LIT0_DEFAULT)
+        self.sres[0] = kwargs.get("sres0", defaults.SRES0_DEFAULT)
 
         # Current timestep index
         self.timestep_ind = 0
 
-    def update(self, temp_ano, npp_flag=True, fcva=0, fcsa=0, fcvs=0):
+    def update(self, temp_ano, catm, npp_flag=True, fcva=0, fcsa=0, fcvs=0):
         """Run the model one time step into the future.
 
         This requires the following input:
@@ -56,16 +66,21 @@ class LandCarbonCycle:
         - fcva: additional flux of carbon from vegetation to atmosphere.
         - fcsa: additional flux of carbon from soil to atmosphere.
         - fcvs: additional flux of carbon from vegetation to soil.
+
+        return values:
+        - Increment of carbon stock in the vegetation pool.
+        - Increment of carbon stock in the soil pool. 
         """
 
         # Calculate new fluxes
         if npp_flag:
-            npp = self.veg_box.get_npp(temp_ano, self.catm)
+            npp = self.veg_box.get_npp(temp_ano, catm)
         else:
-            gpp = self.veg_box.get_gpp(temp_ano, self.catm)
-            vres = self.veg_box.get_vres(temp_ano, self.catm)
-        lit = self.veg_box.get_litterfall(temp_ano, self.catm)
-        sres = self.soil_box.get_sres(temp_ano, self.catm)
+            gpp = self.veg_box.get_gpp(temp_ano, catm)
+            vres = self.veg_box.get_vres(temp_ano, catm)
+
+        lit = self.veg_box.get_litterfall(temp_ano, catm)
+        sres = self.soil_box.get_sres(temp_ano, catm)
 
         # Calculate new carbon stocks using an implicit euler scheme
         if npp_flag:
@@ -82,20 +97,21 @@ class LandCarbonCycle:
         # csoil*(1.0-dt*sres) + gamma*dt*cveg + dt*(fcvs-fcsa)
         csoilnew = (
             self.csoil[self.timestep_ind] * (1.0 - self.dt * sres)
-            + lit * self.dt * self.cveg[self.timestep_ind]
+            + lit * self.dt * cvegnew
             + self.dt * (fcvs - fcsa)
         )
-        print(self.csoil[self.timestep_ind])
+
         # Save new values
-        self.cveg[self.timestep_ind + 1] = cvegnew
-        self.csoil[self.timestep_ind + 1] = csoilnew
+        self.veg_box.stock = self.cveg[self.timestep_ind + 1] = cvegnew
+        self.soil_box.stock = self.csoil[self.timestep_ind + 1] = csoilnew
         self.lit[self.timestep_ind + 1] = lit * cvegnew
         self.sres[self.timestep_ind + 1] = sres * csoilnew
         if npp_flag:
-            self.npp[self.timestep_ind + 1] = npp * cvegnew
+            self.npp[self.timestep_ind + 1] = npp
         else:
-            self.gpp[self.timestep_ind + 1] = gpp * cvegnew
+            self.gpp[self.timestep_ind + 1] = gpp
             self.vres[self.timestep_ind + 1] = vres * cvegnew
+            self.npp[self.timestep_ind + 1] = gpp - self.vres[self.timestep_ind + 1]
 
         self.fcva[self.timestep_ind + 1] = fcva
         self.fcsa[self.timestep_ind + 1] = fcsa
@@ -103,4 +119,7 @@ class LandCarbonCycle:
 
         self.timestep_ind += 1
 
-        return cvegnew, csoilnew
+        return (
+            cvegnew - self.cveg[self.timestep_ind - 1],
+            csoilnew - self.csoil[self.timestep_ind - 1],
+        )
