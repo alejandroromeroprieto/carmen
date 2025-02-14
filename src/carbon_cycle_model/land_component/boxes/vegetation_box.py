@@ -21,7 +21,6 @@ class VegetationBox(AbstractLandBox):
     """Vegetation box class."""
 
     def __init__(self, **kwargs):
-        print("=======", kwargs)
         super().__init__(kwargs.get("cveg0", defaults.CVEG0_DEFAULT))
         self.catm0 = kwargs.get("catm0", defaults.CATM0_DEFAULT)
         self.gpp0 = kwargs.get("gpp0", defaults.GPP0_DEFAULT)

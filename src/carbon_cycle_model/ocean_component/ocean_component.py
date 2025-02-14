@@ -124,7 +124,6 @@ class OceanCarbonCycle:
         dco2_ocn = 0.0
 
         # This rest of this function is as taken by Glen Harris code
-        # TODO: do I want to do something about this once the model is working?
         for k0 in range(n4occ):
             k = k0 + 1
             catmk = catm1 + grad_catm * dtstep * (k - 0.5)  # (k-0.5) midpoint of dtstep
@@ -139,8 +138,7 @@ class OceanCarbonCycle:
 
             # much faster than the original
             msum = np.sum(cmol * uptake[:istep] * rjoos[istep:0:-1])
-            # for ii in range(0,istep):
-            #     msum = msum + (cmol*uptake[ii])*rjoos[istep-ii]
+
             msum = dtstep * msum
             psum = self.molcon_to_ppm(msum)  # psum has units of ppm
             # ! Net C0_2 flux

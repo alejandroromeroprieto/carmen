@@ -30,16 +30,17 @@ class CarbonCycle:
     - esm_data: object of type "Data", containing ESM data necessary to run the emulation.
                 The intended provenance of this argument is the output from load_esm_data(),
                 loading esm data from files under the data/ folder.
-    - dtpred:   timestep (in years) used to run the emulation. Notice that values smaller than
-                a year are recommended for accurate integration, but this does not mean the model
-                offers any seasonal prediction.
-    - dtoccmax: timestep (in years) used to run the emulation of the ocean carbon cycle. The scheme
-                is comparatively lower than the land's, hence the different (slightly larger) timestep.
-    - kwargs:   dictionary containing the values for the model parameters, as presented under the
-                scenarios/ folder.
+    - dtpred:   timestep (in years) used to run the emulation. Notice that values smaller
+                than a year are recommended for accurate integration, but this does not
+                mean the model offers any seasonal prediction.
+    - dtoccmax: timestep (in years) used to run the emulation of the ocean carbon cycle.
+                The scheme is comparatively slower than the land's, so users may want to
+                use a larger timestep for this component.
+    - kwargs:   dictionary containing the values for the model parameters, as presented
+                under the scenarios/ folder.
     """
 
-    def __init__(self, esm_data, dtpred=0.03, dtoccmax=0.05, **kwargs):
+    def __init__(self, esm_data, dtpred=0.03, dtoccmax=0.03, **kwargs):
         # Calculate the number of steps the model will perform, so
         # model arrays can be prepared for that exact number of time points.
         num_steps = round(1 + (esm_data.time[-1] - esm_data.time[0]) / dtpred)
@@ -57,13 +58,14 @@ class CarbonCycle:
         self.dtpred = dtpred
         self.dtoccmax = dtoccmax
 
-    # def run_full_simulation(self, model_data, npp_flag=False, dtpred=0.1, dtoccmax=0.1):
     def run_full_simulation(self, npp_flag=False):
         """
         Given the data from another model, run a full simulation.
 
-        TODO: maybe change dtoccmax name when it is working
-        maybe just pass ocean_steps_per_model_steps directly
+        - npp_flag: whether to use NPP, rather than GPP and vegetation respiration, in
+                    the emulation.
+
+        return: Data object with results of the emulation.
         """
 
         # ESM data is in yearly format, but we allow non-yearly timesteps. We need,
@@ -112,7 +114,8 @@ class CarbonCycle:
         # Cumulative emissions, used to track carbon losses
         cems = np.zeros(self.num_steps)
 
-        # To avoid instabilities, we use a smaller timestep for the ocean component
+        # To avoid instabilities, you may want to use a smaller timestep for
+        # the ocean component
         timestep = time_i[1] - time_i[0]
         ocean_steps_per_model_steps = max([1, int(timestep / self.dtoccmax)])
         dt4occ = timestep / ocean_steps_per_model_steps
@@ -237,6 +240,8 @@ class CarbonCycle:
 
     def create_plots(self, model, output, npp_flag):
         "Create some plots about the carbon cycle emulation."
+
+        # TODO: go over this function and clean it up.
 
         # Simple diagnostic plot of emissions, and corresponding SCC catm predictions
         # (with GCM temperature).
@@ -444,16 +449,6 @@ def main():
     """ "
     Main point of entry to build an instance of the carbon cycle emulator, load the
     data and parameters, and run the emulation of the carbon cycle from a CMIP6 ESM.
-
-    TODO: revaluate these notes when done.
-    Notes
-    1. One gets numerical instability if dtoccmax is too large. It seems to kick in for
-    a few models for dtoccmax of 0.25 or greater, so best to keep dtoccmax to 0.2 or less.
-
-    2. Even in the case where emissions are supplied, some of his values seem a bit
-    suspect. Therefore, for credibility and to get good emulation, we calculate emissions
-    from mass conservation in the same way
-    for all models, and always set recalcEmis=True
     """
 
     pars_dir = "data/pars"
@@ -461,15 +456,19 @@ def main():
 
     smoothing_algorithm = {"type": "savgol", "pars": [21, 3]}
 
+    # Numerical instability can arise if dtoccmax is too large. We recommend to keep it
+    # to 0.2 or less.
     dtpred = 0.03  # main timestep (years) for land carbon cycle
-    dtoccmax = 0.05  # max timestep (years) for ocean carbon cycle
+    dtoccmax = 0.03  # max timestep (years) for ocean carbon cycle
 
+    # Calculate emissions from carbon mass conservation across the different carbon pools
     recalc_emis = True
 
+    # Run the cli parser and retrieve the required information
     models, scenario, scenario_pars, era, save, npp_flag = cli_parser()
 
+    # Run emulation for each model
     for imodel, model in enumerate(models):
-
         # If we are dealing with an SSP scenario, average the first few data
         # points to denoise the first value. However, if dealing with a
         # 1pctco2(-cdr) just take the first value, as subsequent values will
@@ -503,7 +502,7 @@ def main():
         tbeg = systime.time()
 
         # Build the model and run it
-        cc_emulator = CarbonCycle(esm_data, dtpred, dtoccmax, **{'some': 'thing'})
+        cc_emulator = CarbonCycle(esm_data, dtpred, dtoccmax, **{})
         cc_output = cc_emulator.run_full_simulation(npp_flag)
 
         tend = systime.time()

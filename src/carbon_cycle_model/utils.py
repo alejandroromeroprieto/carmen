@@ -5,6 +5,7 @@ Script gathering miscelaneous utilities used in the model.
 import numpy as np
 import scipy
 from scipy.signal import savgol_filter
+import os
 
 from carbon_cycle_model.constants import KELVIN_0, OCEAN_FRAC, PPM2GT
 
@@ -210,31 +211,26 @@ def load_esm_data(
     Attributes of this objects are things like 'gcm.time', 'gcm.catm' or 'gcm.npp'.
 
     INPUT
-    TODO: correct naming schemes when I port the files
-    model:       String, the CMIP6-ESM model name, eg 'NorESM2-LM', 'UKESM1-0-LL', etc.
-    esm_data_file:   String, the name of the input file, eg sum4_MRI-ESM1.txt
-    recalc_emis:  Boolean (default=True). Switch to recalculate the emissions from mass
-                 conservation, rather than using the input data.
+    esm_data_file: String, full path to the input file, eg sum4_MRI-ESM1.txt
+    recalc_emis:   Boolean. Switch to recalculate the emissions from mass
+                   conservation, rather than using the input data.
     ocean_frac:  Float, fraction of the earth surface covered by oceans. Default 0.710369
                  is the HadCM3 ocean_frac. This value was actully used in calibration for
                  all models. ocean_frac is used to estimate the global mean ocean near
                  surface temperature from input Tglb and Tland (Ben's data only has these)
-    cutoff:      Integer, the low bandpass cutoff frequency for potential smoothing that
-                 is applied if emissions are re-estimated from mass conservation.
-                 Default is 10 years.
     ninit:       Integer, the number of initial time points (years) for establishing a
                  temperature baseline againt which we define the anomalies of surface and
                  ocean.
     smoothing_pars Scheme to use to smoothing the read in data. The variable must be a
-                 dictionary with the type of algorithm to run (butterworth or savgol),
-                 and the parameters necessary for that algorithm. The butterworth filter
-                 only needs a parameter specifying the strength of the smoothing (1 is
-                 equal to no smoothing), whereas the savgol smoothing requires two, the
-                 number of points included in the rolling window and the degree of the
-                 polynomial used to fit the points (see here for more information:
-                 https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.savgol_filter.html)
-                 Examples:
-                 {"type": butterworth, "pars": [1]}, {"type": savgol, "pars": [21, 3]}
+                   dictionary with the type of algorithm to run (butterworth or savgol),
+                   and the parameters necessary for that algorithm. The butterworth filter
+                   only needs a parameter specifying the strength of the smoothing (1 is
+                   equal to no smoothing), whereas the savgol smoothing requires two, the
+                   number of points included in the rolling window and the degree of the
+                   polynomial used to fit the points (see here for more information:
+                   https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.savgol_filter.html)
+                   Examples:
+                   {"type": butterworth, "pars": [1]}, {"type": savgol, "pars": [21, 3]}
 
     OUTPUT
     output is written to a 'Data' object (see above) with name 'gcm' here.
@@ -244,7 +240,7 @@ def load_esm_data(
     following quantities:
     time       year
     emission   CO2 emissions. Units: GtC/yr. It equal to -999.0, this represents missing
-               data. E in report.
+               data.
     CO2        atmospheric CO2 conc. Units: ppm
     tas        global mean near-surface temparature. Units: Kelvin
     tas_land   global land mean near-surface temparature. Units: Kelvin
@@ -258,12 +254,20 @@ def load_esm_data(
     fvegsoil   global mean flux of carbon from vegetation to the soil (litterfall flux).
                Units: GtC/yr.
     frh        global mean 'heterotrophic' respiration (soil respiration). Units: GtC/yr.
+    ra         global mean 'autotrophic' respiration (vegetation respiration).
+               Units: GtC/yr.
     fluc       global mean land-use emissions. Units: GtC/yr.
     cveg       total global carbon in the land vegetation. Units: GtC.
     csoil      total global carbon in the soil. Units: GtC.
     cprod      global mean carbon in forestry and agricultural products due to
-               anthropogenic land-use. Not used here. For many models this is always
-               zero. Units: GtC.
+               anthropogenic land-use. Not used here. For some models this may not be
+               included, in which case it is just 0. Units: GtC.
+    fcvegout   Residual global carbon flux from the vegetation to the atmosphere, which is
+               not covered by any of the fluxes above.
+    fcsoilout  Residual global carbon flux from the soil to the atmosphere, which is
+               not covered by any of the fluxes above.
+    fcvegoutcsoilin  Residual global carbon flux from the vegetation to the soil,
+                     which is not covered by any of the fluxes above.
     """
 
     with open(esm_data_file, "r") as f1:
@@ -356,3 +360,16 @@ def load_esm_data(
     )
 
     return gcm
+
+
+def make_all_dirs(fullfilename):
+    "Create necessary directories to host fullfilename."
+    dirarr = fullfilename.split("/")
+    dirarr = dirarr[1:-1]
+    subdir = ""
+    for subname in dirarr:
+        subdir = subdir + "/" + subname
+        if not os.path.exists(subdir):
+            print("making dir: ", subdir)
+            os.makedirs(subdir)
+    return 1

@@ -1,3 +1,7 @@
 # carbon-cycle-model
 
-TODO: gather all defaults into a single file, and just pull from there where necessary
+TODO: write README
+
+Run: PYTHONPATH=src python -m carbon_cycle_model.carbon_cycle_model UKESM1-0-LL --npp
+
+Calibrate: PYTHONPATH=src python -m carbon_cycle_model.calibration.calibrate_model
