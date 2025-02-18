@@ -13,9 +13,8 @@ import numpy as np
 from carbon_cycle_model.cli_parser import cli_parser
 from carbon_cycle_model.land_component.land_component import LandCarbonCycle
 from carbon_cycle_model.ocean_component.ocean_component import OceanCarbonCycle
-from carbon_cycle_model.ocean_component.utils import joos_response
 from carbon_cycle_model.utils import Data, load_esm_data
-from carbon_cycle_model.constants import PPM2GT
+from carbon_cycle_model.constants import PPM2GT, PARS_DIR, SCEN_DIR
 from carbon_cycle_model import defaults
 
 
@@ -36,31 +35,107 @@ class CarbonCycle:
     - dtoccmax: timestep (in years) used to run the emulation of the ocean carbon cycle.
                 The scheme is comparatively slower than the land's, so users may want to
                 use a larger timestep for this component.
-    - kwargs:   dictionary containing the values for the model parameters, as presented
+    - scc_pars: dictionary containing the values for the model parameters, as presented
                 under the scenarios/ folder.
     """
 
-    def __init__(self, esm_data, dtpred=0.03, dtoccmax=0.03, **kwargs):
+    def __init__(self, esm_data={}, dtpred=0.03, dtoccmax=0.03, **scc_pars):
+        # If esm_data is a dictionary, load the esm data and pars for the requested
+        # model/scenario
+        if isinstance(esm_data, dict):
+            model = esm_data.get("model", defaults.MODEL)
+            scenario = esm_data.get("scenario", defaults.MODEL)
+
+            # If we are dealing with an SSP scenario, average the first few data
+            # points to denoise the first value. However, if dealing with a
+            # 1pctco2(-cdr) just take the first value, as subsequent values will
+            # already have significantly diverged from equilibrium.
+            if scenario in ["1pctco2", "1pctco2-cdr"]:
+                ninit_scenario = 1
+            else:
+                ninit_scenario = 20
+
+            # Load diagnosed ESM data from the data dir
+            data_file = Path(__file__).parent / SCEN_DIR / f"sce_{model}_{scenario}.txt"
+            print("\nLoading ESM data from: ", data_file)
+
+            esm_data = load_esm_data(
+                data_file,
+                recalc_emis=True,
+                ninit=ninit_scenario,
+                smoothing_pars={"type": "savgol", "pars": [21, 3]},
+            )
+
+            # If no sccpars have been loaded, load default values for this model/scenario
+
+            # Right now we only have loaded cross_scenario par calibration, so that
+            # is the only one we can load. We could relax this to load calibrations
+            # for different scenarios, in which case we could use scenario-specic
+            # calirbations here
+            scenario_pars = "cross_experiment"
+            if scc_pars == {}:
+                # Load calibrated SCC parameter from saved dict.
+                pars_file = (
+                    Path(__file__).parent
+                    / PARS_DIR
+                    / f"sccpar_{model}_{scenario_pars}.txt"
+                )
+                print("Loading SCC parameters from: ", pars_file)
+
+                with open(pars_file, "r") as infile:
+                    scc_pars = json.load(infile)
+        elif isinstance(esm_data, Data):
+            # Data has already been loaded to the right variable, so no need to do
+            # anything
+            pass
+        else:
+            raise TypeError(
+                f"Unexpected esm_data argument of type: {type(esm_data)}. "
+                f" Allowed object types are string or Data."
+            )
+
         # Calculate the number of steps the model will perform, so
         # model arrays can be prepared for that exact number of time points.
-        num_steps = round(1 + (esm_data.time[-1] - esm_data.time[0]) / dtpred)
+        # If we have ESM data from e.g. 1850-2100, we want to have 1/dtpred steps
+        # for each of those years (including 2100), as the ESM data is an average
+        # of the whole year. Then we can (TODO: optinally?) interpolate back to
+        # yearly date from 1850-2100 for consistency and comparison purposes.
+        # So, if the year difference (esm_data.time[-1] - esm_data.time[0]) is 150,
+        # we actually want to run 151 years, to include the last one.
+        # Additionally, since our code is storing the results for the next step
+        # (i.e. the last step of year 2100 stores the new carbon stocks for the first
+        # step of year 2101), we add an additional step.
+        num_steps = round(1 + (1 + esm_data.time[-1] - esm_data.time[0]) / dtpred)
         time_cc = np.linspace(
-            esm_data.time[0], esm_data.time[-1], num=num_steps, endpoint=True
+            esm_data.time[0], esm_data.time[-1] + 1, num=num_steps, endpoint=True
         )
         timestep = time_cc[1] - time_cc[0]
 
-        self.land = LandCarbonCycle(timestep, num_steps, **kwargs)
-        self.ocean = OceanCarbonCycle(timestep, num_steps, **kwargs)
+        # Create land and ocean components
+        self.land = LandCarbonCycle(timestep, num_steps, **scc_pars)
+        self.ocean = OceanCarbonCycle(
+            timestep, dtoccmax, num_steps, esm_data.time[0], **scc_pars
+        )
 
-        self.catm0 = kwargs.get("catm0", defaults.CATM0_DEFAULT)
+        # Store relevant quantities as attributes
+        self.catm0 = scc_pars.get("catm0", defaults.CATM0_DEFAULT)
+        self.catm = np.ones(num_steps) * scc_pars.get("catm0", defaults.CATM0_DEFAULT)
+        self.cemis = 0
         self.num_steps = num_steps
         self.esm_data = esm_data
         self.dtpred = dtpred
         self.dtoccmax = dtoccmax
 
+        # Only for run_one
+        # TODO: separate into two cases
+        # start = scc_pars.get("time0", defaults.TIME0_DEFAULT)
+        # self.time = np.arange(start, start + num_steps * dtpred, dtpred)
+        self.time = time_cc
+        self.current_step = 0
+
     def run_full_simulation(self, npp_flag=False):
         """
-        Given the data from another model, run a full simulation.
+        Run a full scenario simulation, making use of the ESM data previously loaded.
 
         - npp_flag: whether to use NPP, rather than GPP and vegetation respiration, in
                     the emulation.
@@ -109,33 +184,17 @@ class CarbonCycle:
         else:
             fcvs_i = np.zeros(len(emis_i))
 
-        # Create arrays to store data that is not tracked at subcomponent level
-        catm = self.catm0 * np.ones(self.num_steps)
         # Cumulative emissions, used to track carbon losses
         cems = np.zeros(self.num_steps)
-
-        # To avoid instabilities, you may want to use a smaller timestep for
-        # the ocean component
-        timestep = time_i[1] - time_i[0]
-        ocean_steps_per_model_steps = max([1, int(timestep / self.dtoccmax)])
-        dt4occ = timestep / ocean_steps_per_model_steps
-
-        timeocc = np.arange(time_i[0], time_i[-1] + 0.000001, dt4occ)
-        timeocc[-1] = min(time_i[-1], timeocc[-1])
-        ntimeocc = len(timeocc)
-
-        rjoos = joos_response(timeocc)
-
-        ocn_uptake = np.zeros(ntimeocc, "f")
 
         # Run the components forward
         for i in range(0, self.num_steps - 1):
             timestep = time_i[i + 1] - time_i[i]
-            del_ems = emis_i[i] * timestep
-            del_fcva = fcva_i[i] * timestep
-            del_fcsa = fcsa_i[i] * timestep
-            cems[i + 1] = cems[i] + del_ems  # cummulative emissions
-            co2_atm = catm[i] + (del_ems + del_fcva + del_fcsa) / PPM2GT
+            dt_ems = emis_i[i] * timestep
+            dt_fcva = fcva_i[i] * timestep
+            dt_fcsa = fcsa_i[i] * timestep
+            cems[i + 1] = cems[i] + dt_ems  # cummulative emissions
+            co2_atm = self.catm[i] + (dt_ems + dt_fcva + dt_fcsa) / PPM2GT
 
             # Update land carbon cycle first, then ocean carbon cycle (testing shows
             # order hardly matters).
@@ -151,7 +210,7 @@ class CarbonCycle:
 
             # del_lnd is the difference in carbon in veg and soil
             # so it does include the effects of deforestation and harvesting
-            co2_atm = catm[i] + (del_ems - del_lnd) / PPM2GT
+            co2_atm = self.catm[i] + (dt_ems - del_lnd) / PPM2GT
 
             # Here we are using co2_atm as already updated by the land cycle. It could be
             # argued that we should use co2_atm from previous timestep (unupdated) for
@@ -161,19 +220,18 @@ class CarbonCycle:
             # Update ocean carbon cycle.
             delta_ocn, _ = self.ocean.update(
                 co2_atm,
-                catm[i],
+                self.catm[i],
                 i,
-                ocn_uptake,
-                rjoos,
                 dtocn_i[i + 1],
-                ocean_steps_per_model_steps,
             )
 
-            catm[i + 1] = catm[i] + (del_ems - delta_ocn - del_lnd) / PPM2GT
+            self.catm[i + 1] = self.catm[i] + (dt_ems - delta_ocn - del_lnd) / PPM2GT
+
+            self.current_step += 1
 
         # Undo the change to smaller timesteps by interpolating back to original time
         # points.
-        scc_catm = np.interp(self.esm_data.time, time_i, catm)
+        scc_catm = np.interp(self.esm_data.time, time_i, self.catm)
         scc_cems = np.interp(self.esm_data.time, time_i, cems)
         scc_cveg = np.interp(self.esm_data.time, time_i, self.land.cveg)
         scc_csoil = np.interp(self.esm_data.time, time_i, self.land.csoil)
@@ -192,9 +250,11 @@ class CarbonCycle:
         scc_cdif = (scc_catm * PPM2GT + scc_clnd + scc_cocn) - scc_cems
         scc_cdif = scc_cdif - scc_cdif[0]
 
-        if npp_flag is False:
+        if not npp_flag:
             scc_gpp = np.interp(self.esm_data.time, time_i, self.land.gpp)
-            scc_vres = np.interp(self.esm_data.time, time_i, self.land.vres)
+            scc_vres = np.interp(
+                self.esm_data.time, time_i, self.land.vres / self.land.cveg
+            )
             scc_ra = np.interp(self.esm_data.time, time_i, self.land.vres)
 
             ans = Data(
@@ -238,6 +298,205 @@ class CarbonCycle:
 
         return ans
 
+    def run_one_step(self, new_input, npp_flag=False):
+        """
+        Run an additional step of the simulation, making use of the ESM data previously
+        loaded.
+
+        - new_input: dictionary with the required input to run a new step: TODO: what is the required input?
+        - npp_flag: whether to use NPP, rather than GPP and vegetation respiration, in
+                    the emulation.
+
+        return: Data object with results of the emulation.
+        """
+
+        new_emis = new_input.get("emis")
+        new_dtocn = new_input.get("dtocn")
+        new_dtglb = new_input.get("dtglb")
+
+        if not new_emis or not new_dtocn or not new_dtglb:
+            raise ValueError("Incorrect new_input supplied. Missing required values.")
+
+        new_fcva = new_input.get("fcva", 0)
+        new_fcsa = new_input.get("fcsa", 0)
+        new_fcvs = new_input.get("fcvs", 0)
+
+        # # To avoid instabilities, you may want to use a smaller timestep for
+        # # the ocean component
+        # ocean_steps_per_model_steps = max([1, int(self.dtpred / self.dtoccmax)])
+        # dt4occ = self.dtpred / ocean_steps_per_model_steps
+
+        # # Expand time arrays to cover the new data points
+        # self.time_ocean = np.append(
+        #     self.time_ocean,
+        #     np.arange(
+        #         self.time_ocean[-1],
+        #         self.time_ocean[-1] + ocean_steps_per_model_steps * dt4occ,
+        #         dt4occ,
+        #     ),
+        # )
+        # self.time_land = np.append(self.time_land, [self.time_land + self.dtpred])
+
+        # Run the components forward one step
+        dt_ems = new_emis * self.dtpred
+        dt_fcva = new_fcva * self.dtpred
+        dt_fcsa = new_fcsa * self.dtpred
+        self.cemis += dt_ems  # cummulative emissions
+        co2_atm = self.catm[self.current_step] + (dt_ems + dt_fcva + dt_fcsa) / PPM2GT
+
+        # Update land carbon cycle first, then ocean carbon cycle (testing shows
+        # order hardly matters).
+        delta_cveg, delta_csoil = self.land.update(
+            new_dtglb,
+            co2_atm,
+            npp_flag,
+            fcva=new_fcva,
+            fcsa=new_fcsa,
+            fcvs=new_fcvs,
+        )
+        del_lnd = delta_cveg + delta_csoil
+
+        # del_lnd is the difference in carbon in veg and soil
+        # so it does include the effects of deforestation and harvesting
+        co2_atm = self.catm[self.current_step] + (dt_ems - del_lnd) / PPM2GT
+
+        # Here we are using co2_atm as already updated by the land cycle. It could be
+        # argued that we should use co2_atm from previous timestep (unupdated) for
+        # both land and carbon cycle and then update catm. It probably does not make
+        # much of a difference.
+
+        # Update ocean carbon cycle.
+        delta_ocn, _ = self.ocean.update(
+            co2_atm,
+            self.catm[self.current_step],
+            self.current_step,
+            new_dtocn,
+        )
+
+        self.catm[self.current_step + 1] = (
+            self.catm[self.current_step] + (dt_ems - delta_ocn - del_lnd) / PPM2GT
+        )
+
+        # Undo the change to smaller timesteps by interpolating back to original time
+        # points.
+        # scc_catm = np.interp(self.esm_data.time, time_i, catm)
+        # scc_cems = np.interp(self.esm_data.time, time_i, cems)
+        # scc_cveg = np.interp(self.esm_data.time, time_i, self.land.cveg)
+        # scc_csoil = np.interp(self.esm_data.time, time_i, self.land.csoil)
+        # scc_cocn = np.interp(self.esm_data.time, time_i, self.ocean.carbon_increase)
+        # scc_npp = np.interp(self.esm_data.time, time_i, self.land.npp)
+        # scc_gam = np.interp(self.esm_data.time, time_i, self.land.lit / self.land.cveg)
+        # scc_sres = np.interp(
+        #     self.esm_data.time, time_i, self.land.sres / self.land.csoil
+        # )
+        # scc_lit = np.interp(self.esm_data.time, time_i, self.land.lit)
+        # scc_rh = np.interp(self.esm_data.time, time_i, self.land.sres)
+        # scc_fcvo = np.interp(self.esm_data.time, time_i, self.land.fcva)
+        # scc_fcso = np.interp(self.esm_data.time, time_i, self.land.fcsa)
+
+        self.current_step += 1
+
+        # scc_clnd = self.land.cveg[self.current_step] + self.land.csoil[self.current_step]
+        # # TODO: redo this if I want it.
+        # # scc_cdif = (self.catm * PPM2GT + scc_clnd + self.ocean.carbon_increase) - self.cemis
+        # # scc_cdif = scc_cdif - scc_cdif[0]
+
+        # if not npp_flag:
+        #     # scc_gpp = np.interp(self.esm_data.time, time_i, self.land.gpp)
+        #     # scc_vres = np.interp(
+        #     #     self.esm_data.time, time_i, self.land.vres / self.land.cveg
+        #     # )
+        #     # scc_ra = np.interp(self.esm_data.time, time_i, self.land.vres)
+
+        #     ans = Data(
+        #         time=self.time[self.current_step],
+        #         catm=self.catm[self.current_step],
+        #         cveg=self.land.cveg[self.current_step],
+        #         csoil=self.land.csoil[self.current_step],
+        #         clnd=scc_clnd,
+        #         cocn=self.ocean.carbon_increase[self.current_step],
+        #         oflux=self.ocean.carbon_increase[self.current_step] - self.ocean.carbon_increase[self.current_step-1],
+        #         # cdif=scc_cdif,
+        #         gam=self.land.lit[self.current_step] / self.land.cveg[self.current_step],
+        #         resp=self.land.sres[self.current_step] / self.land.csoil[self.current_step],
+        #         gpp=self.land.gpp[self.current_step],
+        #         vres=self.land.vres[self.current_step] / self.land.cveg[self.current_step],
+        #         npp=self.land.npp[self.current_step],
+        #         lit=self.land.lit[self.current_step],
+        #         ra=self.land.vres[self.current_step],
+        #         rh=self.land.sres[self.current_step],
+        #         fcvo=self.land.fcva[self.current_step],
+        #         fcso=self.land.fcsa[self.current_step],
+        #     )
+        # else:
+        #     ans = Data(
+        #         time=self.time[self.current_step],
+        #         catm=self.catm[self.current_step],
+        #         cveg=self.land.cveg[self.current_step],
+        #         csoil=self.land.csoil[self.current_step],
+        #         clnd=scc_clnd,
+        #         cocn=self.ocean.carbon_increase[self.current_step],
+        #         oflux=self.ocean.carbon_increase[self.current_step] - self.ocean.carbon_increase[self.current_step-1],
+        #         # cdif=scc_cdif,
+        #         gam=self.land.lit[self.current_step] / self.land.cveg[self.current_step],
+        #         resp=self.land.sres[self.current_step] / self.land.csoil,
+        #         npp=self.land.npp[self.current_step],
+        #         lit=self.land.lit[self.current_step],
+        #         rh=self.land.sres[self.current_step],
+        #         fcvo=self.land.fcva[self.current_step],
+        #         fcso=self.land.fcsa[self.current_step],
+        #     )
+        scc_clnd = self.land.cveg + self.land.csoil
+        # TODO: redo this if I want it.
+        # scc_cdif = (self.catm * PPM2GT + scc_clnd + self.ocean.carbon_increase) - self.cemis
+        # scc_cdif = scc_cdif - scc_cdif[0]
+        if not npp_flag:
+            # scc_gpp = np.interp(self.esm_data.time, time_i, self.land.gpp)
+            # scc_vres = np.interp(
+            #     self.esm_data.time, time_i, self.land.vres / self.land.cveg
+            # )
+            # scc_ra = np.interp(self.esm_data.time, time_i, self.land.vres)
+            ans = Data(
+                time=self.time,
+                catm=self.catm,
+                cveg=self.land.cveg,
+                csoil=self.land.csoil,
+                clnd=scc_clnd,
+                cocn=self.ocean.carbon_increase,
+                oflux=np.gradient(self.ocean.carbon_increase)/self.dtpred,
+                # cdif=scc_cdif,
+                gam=self.land.lit / self.land.cveg,
+                resp=self.land.sres / self.land.csoil,
+                gpp=self.land.gpp,
+                vres=self.land.vres / self.land.cveg,
+                npp=self.land.npp,
+                lit=self.land.lit,
+                ra=self.land.vres,
+                rh=self.land.sres,
+                fcvo=self.land.fcva,
+                fcso=self.land.fcsa,
+            )
+        else:
+            ans = Data(
+                time=self.time,
+                catm=self.catm,
+                cveg=self.land.cveg,
+                csoil=self.land.csoil,
+                clnd=scc_clnd,
+                cocn=self.ocean.carbon_increase,
+                oflux=np.gradient(self.ocean.carbon_increase)/self.dtpred,
+                # cdif=scc_cdif,
+                gam=self.land.lit / self.land.cveg,
+                resp=self.land.sres / self.land.csoil,
+                npp=self.land.npp,
+                lit=self.land.lit,
+                rh=self.land.sres,
+                fcvo=self.land.fcva,
+                fcso=self.land.fcsa,
+            )
+
+        return ans
+
     def create_plots(self, model, output, npp_flag):
         "Create some plots about the carbon cycle emulation."
 
@@ -271,8 +530,8 @@ class CarbonCycle:
         )
         leg.draw_frame(False)
 
-        # ! Compare the calculated atmospheric C02 concentration with the one from the ESM dataset
-        # (To see how well the model is performing)
+        # Compare the calculated atmospheric C02 concentration with the one from the ESM
+        # dataset (To see how well the model is performing)
         ax = plt.subplot(1, 4, 2)
         plt.plot(
             self.esm_data.time,
@@ -296,21 +555,21 @@ class CarbonCycle:
         # one from the ESM dataset
         # (To see how well the model is performing)
         ax = plt.subplot(1, 4, 3)
-        plt.plot(output.time, self.esm_data.catm - output.catm, lw=1.0, color="blue")
+        # plt.plot(output.time, self.esm_data.catm - output.catm, lw=1.0, color="blue")
         plt.axhline(0.0, ls=":", color="k")
         plt.title("catm error: ESM-SCC")
 
-        # ! Plot the carbon contained in vegetation, soil, atmosphere and (difference wrt
+        # Plot the carbon contained in vegetation, soil, atmosphere and (difference wrt
         # initial point) ocean.
         ax = plt.subplot(1, 4, 4)
-        plt.plot(output.time, self.esm_data.cveg, label="cveg")
-        plt.plot(output.time, self.esm_data.csoil, label="csoil")
-        plt.plot(output.time, self.esm_data.catm, label="catm")
+        plt.plot(self.esm_data.time, self.esm_data.cveg, label="cveg")
+        plt.plot(self.esm_data.time, self.esm_data.csoil, label="csoil")
+        plt.plot(self.esm_data.time, self.esm_data.catm, label="catm")
         plt.plot(output.time, output.cocn, label="cocn")
         plt.legend()
         plt.show()
 
-        # ! Carbon fluxes
+        # Carbon fluxes
         ax = plt.subplot(2, 4, 1)
         plt.plot(
             self.esm_data.time,
@@ -367,7 +626,7 @@ class CarbonCycle:
         plt.plot(output.time, output.cocn, color="dodgerblue", alpha=0.5, label="SCC")
         plt.title(model + ": fgco2")
 
-        if npp_flag is False:
+        if not npp_flag:
             ax = plt.subplot(2, 4, 5)
             plt.plot(
                 self.esm_data.time,
@@ -444,15 +703,23 @@ class CarbonCycle:
 
         plt.show()
 
+    def interpolate_results(new_time):
+        """
+        Interpolate attributes to a new timeseries
+
+        input:
+        - new_time: new timeseries to interpolate to.
+
+        output: none, but class attributes will be interpolated to the new time series.
+        """
+        TODO: to write
+
 
 def main():
     """ "
     Main point of entry to build an instance of the carbon cycle emulator, load the
     data and parameters, and run the emulation of the carbon cycle from a CMIP6 ESM.
     """
-
-    pars_dir = "data/pars"
-    scen_dir = "data/scenarios"
 
     smoothing_algorithm = {"type": "savgol", "pars": [21, 3]}
 
@@ -479,7 +746,7 @@ def main():
             ninit_scenario = 20
 
         # Load diagnosed ESM data from the data dir
-        data_file = Path(__file__).parent / scen_dir / f"sce_{model}_{scenario}.txt"
+        data_file = Path(__file__).parent / SCEN_DIR / f"sce_{model}_{scenario}.txt"
         print("\nLoading ESM data from: ", data_file)
 
         esm_data = load_esm_data(
@@ -491,18 +758,18 @@ def main():
 
         # Load calibrated SCC parameter from saved dict.
         pars_file = (
-            Path(__file__).parent / pars_dir / f"sccpar_{model}_{scenario_pars}.txt"
+            Path(__file__).parent / PARS_DIR / f"sccpar_{model}_{scenario_pars}.txt"
         )
         print("Loading SCC parameters from: ", pars_file)
 
         with open(pars_file, "r") as infile:
-            sccpars = json.load(infile)
+            scc_pars = json.load(infile)
 
         # Measure the time it takes us to run the model
         tbeg = systime.time()
 
         # Build the model and run it
-        cc_emulator = CarbonCycle(esm_data, dtpred, dtoccmax, **{})
+        cc_emulator = CarbonCycle(esm_data, dtpred, dtoccmax, **scc_pars)
         cc_output = cc_emulator.run_full_simulation(npp_flag)
 
         tend = systime.time()

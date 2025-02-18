@@ -18,7 +18,7 @@ from carbon_cycle_model.ocean_component.ocean_component import OceanCarbonCycle
 from carbon_cycle_model.ocean_component.utils import joos_response
 
 
-class Normalizer():
+class Normalizer:
     """
     A class for normalization of parameters so they lie in the range [0,1].
 

@@ -24,7 +24,7 @@ def cli_parser():
                            we are emulating, so this option is limited to all the SSP
                            scenarios that are published for the given CMIP6 model.
 
-    --scenario-pars, -p  : Changes the parameter set used to run the model. In particular,
+    --scenario_pars, -p  : Changes the parameter set used to run the model. In particular,
                            it instructs the emulator to use the parameters derived by
                            calibrating a specific SSP scenario. Notice that this must
                            still be linked to the same model the emulator is trying to

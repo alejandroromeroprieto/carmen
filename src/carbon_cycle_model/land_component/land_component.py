@@ -69,7 +69,7 @@ class LandCarbonCycle:
 
         return values:
         - Increment of carbon stock in the vegetation pool.
-        - Increment of carbon stock in the soil pool. 
+        - Increment of carbon stock in the soil pool.
         """
 
         # Calculate new fluxes

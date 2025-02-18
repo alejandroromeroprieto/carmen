@@ -12,6 +12,7 @@ import numpy as np
 
 from carbon_cycle_model.constants import GAS_EXCHANGE_COEF, OCEAN_AREA, PPM2GT
 from carbon_cycle_model import defaults
+from carbon_cycle_model.ocean_component.utils import joos_response
 
 
 class OceanCarbonCycle:
@@ -43,10 +44,11 @@ class OceanCarbonCycle:
     estimation is a bit slow.
     """
 
-    def __init__(self, dt, num_steps, **kwargs):
+    def __init__(self, dt_model, dt_ocean, num_steps, t0, **kwargs):
         self.catm0 = kwargs.get("catm0", defaults.CATM0_DEFAULT)
         self.carbon_increase = np.zeros(num_steps)
-        self.dt = dt
+        self.dt = dt_model
+        self.dt_ocean = dt_ocean
         self.num_steps = num_steps
 
         # Parameters
@@ -57,6 +59,20 @@ class OceanCarbonCycle:
 
         # Current timestep index
         self.timestep_ind = 0
+
+        # To avoid instabilities, you may want to use a smaller timestep for
+        # the ocean component
+        ocean_steps_per_model_steps = max([1, int(dt_model / dt_ocean)])
+        self.n4occ = ocean_steps_per_model_steps
+        dt4occ = dt_model / ocean_steps_per_model_steps
+
+        # save the joos response function for later used
+        timeocc = np.arange(t0, t0 + num_steps * dt4occ, dt4occ)
+        self.rjoos = joos_response(timeocc)
+
+        # Create an array to store ocean uptake values
+        ntimeocc = len(timeocc)
+        self.ocn_uptake = np.zeros(ntimeocc)
 
     def molcon_to_ppm(self, dmol):
         """
@@ -88,7 +104,7 @@ class OceanCarbonCycle:
             )
         return ppm
 
-    def update(self, catm, catm1, im1, uptake, rjoos, d_t, n4occ):
+    def update(self, catm, catm1, im1, dt_ocn):
         """
         Update ocean carbon cycle for one timestep.
         INPUT
@@ -98,7 +114,7 @@ class OceanCarbonCycle:
         im1:    integer, index of previous timestep.
         uptake: np.array, ocean CO2 uptake for all times (on shorter ocean timeteps).
         rjoos:  Joos response function for all times.
-        d_t:  float, global mean temperature change wrt pre-industrial (degC)
+        dt_ocn: float, global mean temperature change wrt pre-industrial (degC)
         n4occ:  integer, number of ocean timesteps for each model timestep.
 
         OUTPUT
@@ -107,7 +123,7 @@ class OceanCarbonCycle:
 
         The input/output array uptake is also updated with new values for the ocean
         carbon flux for all ocean timesteps in the current main timestep.
-        uptake is re-used in succeeding call to the Update method.
+        uptake is re-used in succeeding call to the update method.
         """
 
         mol_units_converter = 1.722e17
@@ -115,19 +131,19 @@ class OceanCarbonCycle:
         # following Oscar (gasser 2017)
         docntemp = self.docn * (
             1.0
-            + max(-0.5, min(1.0, self.docnfac * (math.exp(self.docntemp * d_t) - 1)))
+            + max(-0.5, min(1.0, self.docnfac * (math.exp(self.docntemp * dt_ocn) - 1)))
         )
         cmol = mol_units_converter / docntemp
 
-        dtstep = self.dt / n4occ
+        dtstep = self.dt / self.n4occ
         grad_catm = (catm - catm1) / self.dt
         dco2_ocn = 0.0
-
-        # This rest of this function is as taken by Glen Harris code
-        for k0 in range(n4occ):
+    
+        # The rest of this function is as taken from Glen Harris code
+        for k0 in range(self.n4occ):
             k = k0 + 1
             catmk = catm1 + grad_catm * dtstep * (k - 0.5)  # (k-0.5) midpoint of dtstep
-            istep = im1 * n4occ + k  # istep is end of the occ prediction timestep
+            istep = im1 * self.n4occ + k  # istep is end of the occ prediction timestep
 
             # Warning, Python processing is much slower if one doesn't multiply cmol*
             # uptake INSIDE the loop below. Note that uptake here is typically very small:
@@ -137,7 +153,7 @@ class OceanCarbonCycle:
             # msum = np.sum(np.convolve(cmol*uptake[:istep], rjoos[istep:0:-1]))
 
             # much faster than the original
-            msum = np.sum(cmol * uptake[:istep] * rjoos[istep:0:-1])
+            msum = np.sum(cmol * self.ocn_uptake[:istep] * self.rjoos[istep:0:-1])
 
             msum = dtstep * msum
             psum = self.molcon_to_ppm(msum)  # psum has units of ppm
@@ -145,10 +161,10 @@ class OceanCarbonCycle:
             # ! I guess that we take catm0 as in pre-industrial the partial pressures
             # ! would be the same
             # ! due to the equilibrium assumption.
-            cocn = (self.catm0 + psum) * math.exp(self.ocntemp * d_t)
+            cocn = (self.catm0 + psum) * math.exp(self.ocntemp * dt_ocn)
 
             uptakenew = (GAS_EXCHANGE_COEF / OCEAN_AREA) * (catmk - cocn)
-            uptake[istep] = uptakenew
+            self.ocn_uptake[istep] = uptakenew
             dco2_ocn = dco2_ocn + uptakenew * OCEAN_AREA * dtstep * PPM2GT
 
         self.timestep_ind += 1
@@ -156,4 +172,5 @@ class OceanCarbonCycle:
         self.carbon_increase[self.timestep_ind] = (
             self.carbon_increase[self.timestep_ind - 1] + dco2_ocn
         )
+
         return (dco2_ocn, uptakenew)

@@ -5,6 +5,12 @@ supplied by the user (although not entirely sure how useful that is if the user-
 values are from a radically different carbon cycle model).
 """
 
+# Default ESM and scenario to use
+MODEL = "UKESM1-0-LL"
+SCENARIO = "ssp370"
+
+TIME0_DEFAULT = 1850
+
 # Stocks
 CVEG0_DEFAULT = 581.64545517
 CSOIL0_DEFAULT = 1766.34032645

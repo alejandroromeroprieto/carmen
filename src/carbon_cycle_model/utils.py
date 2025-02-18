@@ -273,7 +273,7 @@ def load_esm_data(
     with open(esm_data_file, "r") as f1:
         esm_data = np.genfromtxt(f1, names=True)
 
-    gcm_time = apply_smoothing(esm_data["time"], smoothing_pars)
+    gcm_time = esm_data["time"]
     gcm_emis = apply_smoothing(esm_data["emission"], smoothing_pars)
     gcm_catm = apply_smoothing(esm_data["CO2"], smoothing_pars)
     gcm_tglb = apply_smoothing(esm_data["tas"] - KELVIN_0, smoothing_pars)
