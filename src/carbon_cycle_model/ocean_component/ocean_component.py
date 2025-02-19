@@ -1,10 +1,10 @@
 """
 Class implementing the ocean component of the carbon cycle.
 
-It is based on the scheme developed by Joos et al (1996) where a carbonate
+It is based on the scheme developed by Joos et al. (1996), where a carbonate
 scheme simulates the dissolution of carbon from the atmosphere to the ocean
-mixed layer, and an Impulse-response function is used to approximate the carbon
-export towards the deep ocean
+mixed layer, and an impulse-response function is used to approximate the carbon
+export towards the deep ocean.
 """
 
 import math
@@ -21,13 +21,35 @@ class OceanCarbonCycle:
     the work of Joos et al. (1996).
 
     The class has the following attributes:
-        catm0:   pre-industrial value for atmos CO2 conc. Units: ppm.
-        docn:    initial mixing depth for CO2 uptake. Calibrated parameter. Units: m.
-        docnfac: temperature dependence for change in mixing depth for CO2 uptake.
-                 Calibrated parameter. Units: dimensionless.
-        ocntemp: temperature calibration parameter. Units: 1/K.
+        - catm0: pre-industrial value for atmos CO2 conc. (ppm).
+        - oflux: timeseries of carbon uptake by the ocean (positive into the ocean).
+                 (Gtc/yr)
+        - carbon_increase: cumulative carbon uptake by the ocean (positive into the
+                           ocean). (GtC)
+        - dt: timestep used for the general carbon cycle emulator. (year)
+        - dt_ocean: timestep used for the ocean component of the carbon cycle emulator.
+                    (year)
+        - num_steps: number of steps the general carbon cycle emulator is expected to run.
+                     (dimensionless)
+        - docn: parameter representing initial mixing depth for CO2 uptake. (m)
+        - docnfac: parameter representing the temperature dependence of the mixing layer
+                   depth on CO2 uptake. (dimensionless)
+        - ocntemp: parameter controlling the modulation of the ocean partial carbon
+                   pressure on sea surface temperature. This is an addition to the base
+                   Joos model. (1/K)
+        - docntemp: parameter controlling the modulation of the ocean mixed layer on
+                    sea surface temperature. This is an addition to the base Joos model
+                    (1/K)
 
-    This was originally developed by Glen Harris, at the met office, who had the
+    The initialisation function takes the following arguments:
+    - dt_model: timestep used for the general carbon cycle emulator. (year)
+    - dt_ocean: timestep used for the ocean component of the carbon cycle emulator. (year)
+    - num_steps: number of steps the general carbon cycle emulator is expected to run.
+                 (dimensionless)
+    - t0: initial year of the emulation.
+    - kwargs: dictionary with parameter values for the emulator.
+
+    The code was originally developed by Glen Harris, from the met office, with the
     following information:
         Based on Joos et al. (1996) as implemented in IMOGEN (Huntingford et al 2010).
         IMOGEN source code (Fortran) that was used to inform this is in
@@ -35,17 +57,18 @@ class OceanCarbonCycle:
             /home/h04/hadgh/AM/decks_from_hadley/all_decks/analogue_decks/OCEAN_CO2.dk
         and other files here.
 
-    Note that this implementation can sometimes be numerically unstable for large
-    timesteps. IMOGEN gets around this by using using a smaller timestep. We follow
-    the same approach, by specifying a timestep 'dtoccmax' outside the call to this
-    object, and then calculating the number of smaller ocean timesteps 'n4occ' required
-    for each main timestep. This is input to the Update method. We find that dtocc=0.1
-    years is generally stable. This is less than ideal, in that the ocean carbon cycle
-    estimation is a bit slow.
+        Note that this implementation can sometimes be numerically unstable for large
+        timesteps. IMOGEN gets around this by using using a smaller timestep. We follow
+        the same approach, by specifying a timestep 'dtoccmax' outside the call to this
+        object, and then calculating the number of smaller ocean timesteps 'n4occ'
+        required for each main timestep. We find that dtocc=0.1
+        years is generally stable. This is less than ideal, in that the ocean carbon cycle
+        estimation is a bit slow.
     """
 
     def __init__(self, dt_model, dt_ocean, num_steps, t0, **kwargs):
         self.catm0 = kwargs.get("catm0", defaults.CATM0_DEFAULT)
+        self.oflux = np.zeros(num_steps)
         self.carbon_increase = np.zeros(num_steps)
         self.dt = dt_model
         self.dt_ocean = dt_ocean
@@ -66,13 +89,12 @@ class OceanCarbonCycle:
         self.n4occ = ocean_steps_per_model_steps
         dt4occ = dt_model / ocean_steps_per_model_steps
 
-        # save the joos response function for later used
+        # save the joos response function at all timesteps for later use
         timeocc = np.arange(t0, t0 + num_steps * dt4occ, dt4occ)
         self.rjoos = joos_response(timeocc)
 
         # Create an array to store ocean uptake values
-        ntimeocc = len(timeocc)
-        self.ocn_uptake = np.zeros(ntimeocc)
+        self.ocn_uptake = np.zeros(len(timeocc))
 
     def molcon_to_ppm(self, dmol):
         """
@@ -108,27 +130,24 @@ class OceanCarbonCycle:
         """
         Update ocean carbon cycle for one timestep.
         INPUT
-        dt:     float, timestep, Units: year
         catm:   float, atmospheric CO2 conc (ppm) at current timestep.
         catm1:  float, atmospheric CO2 conc (ppm) at previous timestep.
         im1:    integer, index of previous timestep.
-        uptake: np.array, ocean CO2 uptake for all times (on shorter ocean timeteps).
-        rjoos:  Joos response function for all times.
-        dt_ocn: float, global mean temperature change wrt pre-industrial (degC)
-        n4occ:  integer, number of ocean timesteps for each model timestep.
+        dt_ocn: float, global mean sea surface temperature change wrt pre-industrial
+                (Kelvin/Celsius)
 
         OUTPUT
-        dco2_ocn:  change in ocean carbon over the timestep
-        uptakenew: flux of carbon to ocean at end of timestep
-
-        The input/output array uptake is also updated with new values for the ocean
-        carbon flux for all ocean timesteps in the current main timestep.
-        uptake is re-used in succeeding call to the update method.
+        dco2_ocn: carbon uptake by the ocean over the timestep (positive into ocean)
+                  (GtC/year)
         """
 
         mol_units_converter = 1.722e17
 
-        # following Oscar (gasser 2017)
+        # TODO: explore sensibility to the choice of parameterisation here. (OSCAR has
+        # TODO: d_0*par*e^(par*T))  (Eq__D_mld in link below)
+        # TODO: https://github.com/tgasser/OSCAR/blob/master/core_fct/mod_process.py
+        # Modulation of the mixed layer depth. We follow OSCAR here, and use an
+        # exponential dependence on sea surface temperature.
         docntemp = self.docn * (
             1.0
             + max(-0.5, min(1.0, self.docnfac * (math.exp(self.docntemp * dt_ocn) - 1)))
@@ -138,9 +157,10 @@ class OceanCarbonCycle:
         dtstep = self.dt / self.n4occ
         grad_catm = (catm - catm1) / self.dt
         dco2_ocn = 0.0
-    
+
         # The rest of this function is as taken from Glen Harris code
         for k0 in range(self.n4occ):
+            total_uptake = 0  # Total uptake for this dtstep
             k = k0 + 1
             catmk = catm1 + grad_catm * dtstep * (k - 0.5)  # (k-0.5) midpoint of dtstep
             istep = im1 * self.n4occ + k  # istep is end of the occ prediction timestep
@@ -157,20 +177,22 @@ class OceanCarbonCycle:
 
             msum = dtstep * msum
             psum = self.molcon_to_ppm(msum)  # psum has units of ppm
-            # ! Net C0_2 flux
-            # ! I guess that we take catm0 as in pre-industrial the partial pressures
-            # ! would be the same
-            # ! due to the equilibrium assumption.
+            # Net C0_2 flux
+            # I guess that we take catm0 as in pre-industrial the partial pressures
+            # would be the same
+            # due to the equilibrium assumption.
             cocn = (self.catm0 + psum) * math.exp(self.ocntemp * dt_ocn)
 
             uptakenew = (GAS_EXCHANGE_COEF / OCEAN_AREA) * (catmk - cocn)
             self.ocn_uptake[istep] = uptakenew
-            dco2_ocn = dco2_ocn + uptakenew * OCEAN_AREA * dtstep * PPM2GT
+            total_uptake += uptakenew * OCEAN_AREA * dtstep * PPM2GT
 
+        dco2_ocn += total_uptake
         self.timestep_ind += 1
 
         self.carbon_increase[self.timestep_ind] = (
             self.carbon_increase[self.timestep_ind - 1] + dco2_ocn
         )
+        self.oflux[self.timestep_ind] = total_uptake / self.dt
 
-        return (dco2_ocn, uptakenew)
+        return dco2_ocn

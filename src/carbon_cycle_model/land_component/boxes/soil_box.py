@@ -1,12 +1,9 @@
 """
-Soil box code.
+Soil box class.
 
-This box keeps track of its own carbon stock, and calculates
-one associated fluxes:
+This box keeps track of the carbon content in the soil, and calculates one associated
+flux:
     - get_sres(temp_ano, catm): soil (heterotrophic) respiration (GtC/y).
-where:
-    - temp_ano: temperature anomaly. (kelvin/celsius)
-    - catm: atmospheric concentration of caron (ppm)
 """
 
 from carbon_cycle_model.land_component.boxes.abstract_box import AbstractLandBox
@@ -29,7 +26,14 @@ class SoilBox(AbstractLandBox):
         self.sres_t_l = kwargs.get("sres_t_l", defaults.SRES_T_L)
 
     def get_sres(self, temp_ano, catm):
-        """Soil respiration coefficient."""
+        """
+        Soil respiration coefficient. It should be multiplied by the soil carbon content
+        to obtain the total soil respiration flux.
+
+        input:
+        - temp_ano: temperature anomaly from pre-industrial (kelvin/celsius).
+        - catm: atmospheric concentration of carbon dioxide (ppm).
+        """
 
         return general_calibration_fun(
             self.sres0_par,

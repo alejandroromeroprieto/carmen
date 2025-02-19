@@ -1,5 +1,5 @@
 """
-File to gather some useful functions for the ocean carbon cycle.
+File to store any auxiliary functions for the ocean carbon cycle.
 """
 
 import math
@@ -8,10 +8,10 @@ import numpy as np
 
 def joos_response(time_array):
     """
-    Return an array of the same length as the input with the value for the
-    impulse response function -- r_s in Joos et al. (1996) -- fitted to the
-    Princeton 3D model at each timepoint in time. This IRF is used to
-    approximate the export of carbon to the deep ocean from the mixed layer.
+    Return an array of the same length as the input time array with the value for the
+    impulse response function -- r_s in Joos et al. (1996) -- fitted to the Princeton 3D
+    model at each timepoint in time. This IRF is used to approximate the export of carbon
+    to the deep ocean from the mixed layer.
     """
     ans = np.zeros(time_array.shape[0])
     for i in range(0, time_array.shape[0]):

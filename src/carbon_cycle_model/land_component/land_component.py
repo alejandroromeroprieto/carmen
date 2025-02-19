@@ -2,8 +2,8 @@
 Class implementing the land component of the carbon cycle.
 
 It includes two boxes: vegetation and soil. These boxes interact between them
-and with a conceptual atmosphere box which is simply tracked as a number, which
-quantifies the carbon concentration in the atmosphere.
+and with an abstract atmosphere box which is simply tracked as a number, the
+carbon dioxide concentration in the atmosphere.
 """
 
 import numpy as np
@@ -16,6 +16,23 @@ from carbon_cycle_model import defaults
 class LandCarbonCycle:
     """
     Class implementing the land component of the carbon cycle.
+
+    input:
+    - dt: timestep size.
+    - num_steps: number of steps the model is expected to run.
+    - kwargs: dictionary with parameter values.
+
+    This class stores as attributes the historical timeseries of:
+    - cveg: carbon content in the vegetation pool.
+    - csoil: carbon concenten in the soil pool.
+    - gpp: gross primary production flux.
+    - npp: net primary production flux.
+    - vres: autotrophic respiration flux.
+    - lit: litterfall flux.
+    - sres: heterotrophic respiration flux.
+    - fcva: additional carbon flux from vegetation to atmosphere.
+    - fcsa: additional carbon flux from soil to atmosphere.
+    - fcvs: additional carbon flux from vegetation to soil.
     """
 
     def __init__(self, dt, num_steps, **kwargs):
@@ -25,8 +42,6 @@ class LandCarbonCycle:
 
         # pre-industrial value for atmos CO2 conc. Units: ppm.
         self.catm0 = kwargs.get("catm0", defaults.CATM0_DEFAULT)
-        # Initital value for atmos CO2 conc. Units: ppm
-        self.catm = kwargs.get("catm", defaults.CATM0_DEFAULT)
         # Timestep. Unit: years
         self.dt = dt
         # Number of timesteps in the simulation. Unit: dimensionless.
@@ -62,6 +77,7 @@ class LandCarbonCycle:
 
         This requires the following input:
         - temp_ano: current temperature difference from pre-industrial (Kelvin/celsius).
+        - catm: atmospheric concentration of carbon dioxide (ppm).
         - npp_flag: whether to use the npp flux, or the GPP/vres fluxes.
         - fcva: additional flux of carbon from vegetation to atmosphere.
         - fcsa: additional flux of carbon from soil to atmosphere.

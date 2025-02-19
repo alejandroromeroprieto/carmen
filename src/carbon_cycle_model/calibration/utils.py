@@ -1,5 +1,5 @@
 """
-Helper functions to the calibration code.
+File to store any auxiliary functions for the calibration code.
 """
 
 import os
@@ -44,7 +44,7 @@ class Normalizer:
         self.npar = npar
 
     def normalise(self, x=None):
-        "Convert dimensional input into the corresponding normalised values."
+        "Convert dimensional input (x) into the corresponding normalised values."
         ans = x.copy()
         for i, (lo, hi) in enumerate(self.pranges):
             if hi == lo:
@@ -54,7 +54,7 @@ class Normalizer:
         return ans
 
     def inv(self, x=None):
-        "Convert normalised input into the corresponding dimensional values."
+        "Convert normalised input (x) into the corresponding dimensional values."
         ans = x.copy()
         for i, (lo, hi) in enumerate(self.pranges):
             ans[i] = lo + x[i] * (hi - lo)
@@ -62,7 +62,7 @@ class Normalizer:
 
 
 def load_and_prepare_esm_data(
-    path, model, experiment, recalcEmis, ninit, smoothing_alg
+    path, model, experiment, recalc_emis, ninit, smoothing_alg
 ):
     """
     Load and prepare the ESM data for calibration.
@@ -73,9 +73,9 @@ def load_and_prepare_esm_data(
 
     Input:
     - path: filepath to the folder where ESM input data files are saved.
-    - model: ESM to run calirbration against.
+    - model: ESM to run the calibration against.
     - experiment: scenario to run calibration against.
-    - recalcEmis: whether to recalculate emissions based on carbon balance.
+    - recalc_emis: whether to recalculate emissions based on carbon balance.
     - ninit: number of initial datapoints (years) to use in the derivation of the
              pre-industrial quantities.
     - smoothing_alg: smoothing algorithm to use when loading the ESM data.
@@ -87,7 +87,7 @@ def load_and_prepare_esm_data(
     print("Loading file: ", file_path)
 
     esm_input = load_esm_data(
-        file_path, recalcEmis, ninit=ninit, smoothing_pars=smoothing_alg
+        file_path, recalc_emis, ninit=ninit, smoothing_pars=smoothing_alg
     )
 
     # Get initial figures for the relevant quantities for the model
@@ -213,8 +213,8 @@ def run_minimisation(func, p0, inargs, xlo, xhi, ftol=1e-6, attempts=5):
             f"{len(xlo)} - {len(xhi)}"
         )
     bounds = []
-    for i in range(len(xlo)):
-        bounds.append((xlo[i], xhi[i]))
+    for idx, xlo_instance in enumerate(xlo):
+        bounds.append((xlo_instance, xhi[idx]))
 
     outmin = minimize_parallel(
         func,
@@ -334,6 +334,12 @@ def calculate_cost_gen_func_cross_experiment(
     - esm_data: dictionary containing the esm data for the specific model.
     - model: model to use for input to the cost calculation. Essentially, the model
              we are calibrating against.
+    - flux0: pre-industrial value for the carbon flux we are applying the "gen_func"
+             approximation to. (GtC/year)
+    - stock: timeseries of the carbon stocks of the relevant pool for the experiment
+            we are calibrating against. (GtC)
+    - esm_flux: timeseries of the relevant carbon flux for the experiment we are
+                calibrating against. (GtC/year)
 
     return: total cost across experiments.
     """
@@ -369,15 +375,15 @@ def calculate_cost_gen_func(param, normalizer, flux0, catm, stock, dtglb, esm_fl
     - normaliser: normaliser object to translate par values from dimenional to
                   normalised and vice versa.
     - flux0: pre-industrial value for the carbon flux we are applying the "gen_func"
-             approximation to.
+             approximation to. (GtC/year)
     - catm: timeseries of the carbon concentration of the atmosphere for the experiment
-            we are calibrating against.
+            we are calibrating against. (ppm)
     - stock: timeseries of the carbon stocks of the relevant pool for the experiment
-            we are calibrating against.
+            we are calibrating against. (GtC)
     - dtglb: timeseries of the temperature anomaly for the experiment we are calibrating
-            against.
+            against. (K)
     - esm_flux: timeseries of the relevant carbon flux for the experiment we are
-                calibrating against.
+                calibrating against. (GtC/year)
 
     return: total cost for the experiment.
     """
@@ -410,7 +416,7 @@ def cost_gen_func(
 
     input:
     - flux0: pre-industrial value for the carbon flux we are applying the "gen_func"
-             approximation to.
+             approximation to. (GtC/year)
     - par_t_l: parameter associated with the linear dependence on temperature of gen_func
     - par_t_e: parameter associated with the exponential dependence on temperature of
                gen_func
@@ -419,13 +425,13 @@ def cost_gen_func(
     - par_c_half: parameter associated with the atmospheric carbon saturation component
                   of gen_func
     - dtglb: timeseries of the temperature anomaly for the experiment we are calibrating
-            against.
+            against. (K)
     - catm: timeseries of the carbon concentration of the atmosphere for the experiment
-            we are calibrating against.
+            we are calibrating against. (ppm)
     - stock: timeseries of the carbon stocks of the relevant pool for the experiment
-            we are calibrating against.
+            we are calibrating against. (GtC)
     - esm_flux: timeseries of the relevant carbon flux for the experiment we are
-                calibrating against.
+                calibrating against. (GtC/year)
     - cutoff: cutoff period for the butterworth filter.
 
     return: total cost for the experiment.
@@ -466,10 +472,10 @@ def calculate_cost_ocean_cross_experiment(param, normalizer, esm_data, model, dt
     - param: parameters to define the instance of "gen_func" to calculate the cost of.
     - normalizer: normaliser object to translate par values from dimensional to
                   normalised and vice versa.
-    - esm_data: dictionary containing the esm data for the specific model.
+    - esm_data: dictionary containing the esm data for the specific model. (GtC/year)
     - model: model to use for input to the cost calculation. Essentially, the model
              we are calibrating against.
-    - dtime0: time step size for the ocean emulation.
+    - dtime0: time step size for the ocean emulation. (year)
 
     return: total cost across experiments.
     """
@@ -516,14 +522,14 @@ def costdocn1(
     - param: parameters to define the instance of "gen_func" to calculate the cost of.
     - normalizer: normaliser object to translate par values from dimensional to
                   normalised and vice versa.
-    - dtime0: timestep size.
+    - dtime0: timestep size. (year)
     - num_steps: number of time steps for the ocean emulation.
     - intime: array with ESM time.
-    - catm: array with atmospheric carbon concentrations.
+    - catm: array with atmospheric carbon concentrations. (ppm)
     - esm_flux: array with atmosphere-ocean carbon exchange values from the ESM.
-                This is what we are trying to emulate.
-    - esm_data: dictionary containing the esm data for the specific model.
-    - dtocn: global mean near surface ocean temperature
+                This is what we are trying to emulate. (GtC/year)
+    - esm_data: dictionary containing the esm data for the specific model. (GtC/year)
+    - dtocn: global mean near surface ocean temperature. (K)
 
     return: total cost across experiments.
     """
@@ -571,17 +577,17 @@ def cost_docn(
     - catm0: pre-industrial atmospheric carbon concentration.
     - dtime0: timestep size.
     - num_steps: number of time steps for the ocean emulation.
-    - docn: initial mixing depth for CO2 uptake. Calibrated parameter. Units: m.
+    - docn: initial mixing depth for CO2 uptake. Calibrated parameter. (m)
     - docnfac: temperature dependence for change in mixing depth for CO2 uptake.
-               Calibrated parameter. Units: dimensionless.
-    - ocntemp: temperature calibration parameter. Units: 1/K.
+               Calibrated parameter. (dimensionless).
+    - ocntemp: temperature calibration parameter. (1/K).
     - intime: array with ESM time.
-    - catm: array with atmospheric carbon concentrations.
+    - catm: array with atmospheric carbon concentrations. (ppm)
     - esm_flux: array with atmosphere-ocean carbon exchange values from the ESM.
-                This is what we are trying to emulate.
-    - esm_data: dictionary containing the esm data for the specific model.
-    - dtocn: global mean near surface ocean temperature
-    - cutoff: frequency cutoff for the butterworth filter used to smooth calculate
+                This is what we are trying to emulate. (GtC/year)
+    - esm_data: dictionary containing the esm data for the specific model. (GtC/year)
+    - dtocn: global mean near surface ocean temperature (K)
+    - cutoff: cutoff period for the butterworth filter used to smooth calculate
               variance.
 
     return: total cost across experiments.
@@ -614,15 +620,15 @@ def docn_func(
 
     input:
     - catm0: pre-industrial atmospheric carbon concentration.
-    - dtime0: timestep size.
+    - dtime0: timestep size. (year)
     - num_steps: number of time steps for the ocean emulation.
-    - docn: initial mixing depth for CO2 uptake. Calibrated parameter. Units: m.
+    - docn: initial mixing depth for CO2 uptake. Calibrated parameter. (m).
     - docnfac: temperature dependence for change in mixing depth for CO2 uptake.
-               Calibrated parameter. Units: dimensionless.
-    - ocntemp: temperature calibration parameter. Units: 1/K.
+               Calibrated parameter. (dimensionless)
+    - ocntemp: temperature calibration parameter. (1/K)
     - intime: array with ESM time.
-    - catm: array with atmospheric carbon concentrations.
-    - dtocn: global mean near surface ocean temperature
+    - catm: array with atmospheric carbon concentrations. (ppm)
+    - dtocn: global mean near surface ocean temperature. (K)
 
     return: total cost across experiments.
     """
@@ -743,8 +749,8 @@ def plot_diagnostic(
 
     plt.close("all")
     # Defining some properties for the document to output
-    FONTSIZE = fontsize
-    matplotlib.rcParams.update({"font.size": FONTSIZE})
+    plot_fontsize = fontsize
+    matplotlib.rcParams.update({"font.size": plot_fontsize})
     pdfpages = PdfPages(outplot)
     lw = 1.0
     colfit1 = "red"
@@ -757,10 +763,10 @@ def plot_diagnostic(
     handletextpad = 0.35
     labelspacing = 0.25
     legsize = 0.8
-    xsizeCon = xsize
-    ysizeCon = xsize - 3.0
+    x_size_con = xsize
+    y_size_con = xsize - 3.0
     figsize = (xsize / 2.54, ysize / 2.54)  # convert input size (cm) to inches
-    consize = (xsizeCon / 2.54, ysizeCon / 2.54)
+    consize = (x_size_con / 2.54, y_size_con / 2.54)
     legsize = legsize * fontsize
     legloc = "best"
 
@@ -933,7 +939,8 @@ def plot_diagnostic(
             plt.xlabel(fit.conlabel[j1])
             plt.ylabel(fit.conlabel[j2])
             tit1 = tit + ", ln(MSE/SIGMA)"
-            tit2 = "(" + "".join(["%9.4f" % par + "," for par in fit.pstar])[:-1] + ")"
+            tit2 = f"({','.join(f'{par:9.4f}' for par in fit.pstar)})"
+            # tit2 = "(" + "".join(["%9.4f" % par + "," for par in fit.pstar])[:-1] + ")"
             ax.set_title(tit1 + "\n " + tit2)
             pdfpages.savefig()
 

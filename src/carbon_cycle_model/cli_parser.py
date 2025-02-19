@@ -1,5 +1,5 @@
 """
-CLI entry point for the carbon cycle model.
+CLI entry point for the carbon cycle emulator.
 """
 
 import argparse
@@ -15,114 +15,99 @@ def cli_parser():
 
     Where the desired model (e.g. UKESM1-0-LL) to emulate is the only positional
     argument. That command defaults to running the SSP585 scenario from a set of
-    parameters calibrated using all scenarios for that model.
+    parameters calibrated using all scenarios for that specific model.
 
     This base behaviour can be modified by the following optional arguments:
 
     --scenario, -s  :      Changes the data used to run the simulation to the desired
-                           scenario. Notice that the data must come from the same model
+                           scenario. Notice that the data should come from the same model
                            we are emulating, so this option is limited to all the SSP
                            scenarios that are published for the given CMIP6 model.
 
     --scenario_pars, -p  : Changes the parameter set used to run the model. In particular,
                            it instructs the emulator to use the parameters derived by
-                           calibrating a specific SSP scenario. Notice that this must
+                           calibrating a specific SSP scenario. Notice that this should
                            still be linked to the same model the emulator is trying to
                            emulate.
+
+    --save,              : save some results from the emulation.
 
     --npp                : Boolean flag that, if present, instucts the emulator to use
                            NPP, rather than GPP and vegetation respiration separately.
 
-    --save, -s            : save some results from the emulation.
-
     """
+    # Supported models
     model_list = {
-        "CMIP5_1pctco2": [
-            "bcc-csm1-1",
-            "bcc-csm1-1-m",
-            "BNU-ESM",
-            "CanESM2",
-            "CESM1-BGC",
-            "FIO-ESM",
-            "GFDL-ESM2G",
-            "GFDL-ESM2M",
-            "HadGEM2-ES",
-            "inmcm4",
-            "IPSL-CM5A-LR",
-            "MIROC-ESM",
-            "MPI-ESM-LR",
-            "MRI-ESM1",
-            "NorESM1-ME",
-        ],
-        "CMIP6_1pctco2": [
-            "ACCESS-ESM1-5",
-            "BCC-CSM2-MR",
-            "CanESM5",
-            "CESM2",
-            "CMCC-ESM2",
-            "CNRM-ESM2-1",
-            "IPSL-CM6A-LR",
-            "MIROC-ES2L",
-            "MPI-ESM1-2-LR",
-            "MRI-ESM2-0",
-            "NorESM2-LM",
-            "UKESM1-0-LL",
-        ],
-        "CMIP6_1pctco2-cdr": [
-            "ACCESS-ESM1-5",
-            "CanESM5",
-            "CESM2",
-            "CNRM-ESM2-1",
-            "MIROC-ES2L",
-            "NorESM2-LM",
-            "UKESM1-0-LL",
-        ],
-        "CMIP6_ssp126": ["UKESM1-0-LL"],
-        "CMIP6_ssp245": ["UKESM1-0-LL"],
-        "CMIP6_ssp434": ["UKESM1-0-LL"],
-        "CMIP6_ssp534-over": ["UKESM1-0-LL"],
-        "CMIP6_ssp585": [
-            "UKESM1-0-LL",
-            "IPSL-CM6A-LR",
-            "MPI-ESM1-2-LR",
-            "MIROC-ES2L",
-            "MRI-ESM2-0",
-        ],
-        "CMIP6_historical": ["IPSL-CM6A-LR"],
+        # "CMIP6_1pctco2": [
+        #     "ACCESS-ESM1-5",
+        #     "BCC-CSM2-MR",
+        #     "CanESM5",
+        #     "CESM2",
+        #     "CMCC-ESM2",
+        #     "CNRM-ESM2-1",
+        #     "IPSL-CM6A-LR",
+        #     "MIROC-ES2L",
+        #     "MPI-ESM1-2-LR",
+        #     "MRI-ESM2-0",
+        #     "NorESM2-LM",
+        #     "UKESM1-0-LL",
+        # ],
+        # "CMIP6_1pctco2-cdr": [
+        #     "ACCESS-ESM1-5",
+        #     "CanESM5",
+        #     "CESM2",
+        #     "CNRM-ESM2-1",
+        #     "MIROC-ES2L",
+        #     "NorESM2-LM",
+        #     "UKESM1-0-LL",
+        # ],
+        # "CMIP6_ssp126": ["UKESM1-0-LL"],
+        # "CMIP6_ssp245": ["UKESM1-0-LL"],
+        # "CMIP6_ssp434": ["UKESM1-0-LL"],
+        # "CMIP6_ssp534-over": ["UKESM1-0-LL"],
+        # "CMIP6_ssp585": [
+        #     "UKESM1-0-LL",
+        #     "IPSL-CM6A-LR",
+        #     "MPI-ESM1-2-LR",
+        #     "MIROC-ES2L",
+        #     "MRI-ESM2-0",
+        # ],
+        # "CMIP6_historical": ["IPSL-CM6A-LR"],
+        # These parameter values were trained using all avaiable SSPs for the model
         "CMIP6_cross_experiment": [
-            "UKESM1-0-LL",
-            "MPI-ESM1-2-LR",
+            "ACCESS-ESM1-5",
+            "BCC-CSM2-MR",
+            "CanESM5",
+            "CESM2",
+            "CMCC-ESM2",
+            "CNRM-ESM2-1",
+            "GFDL-ESM4",
             "IPSL-CM6A-LR",
             "MIROC-ES2L",
-            "NorESM2-LM",
-            "CanESM5",
-            "MRI-ESM2-0",
-            "CNRM-ESM2-1",
-            "CESM2",
-            "BCC-CSM2-MR",
-            "ACCESS-ESM1-5",
-            "CMCC-ESM2",
-            "GFDL-ESM4",
-        ],
-        "CMIP6_holistic": [
-            "UKESM1-0-LL",
             "MPI-ESM1-2-LR",
-            "IPSL-CM6A-LR",
-            "MIROC-ES2L",
-            "NorESM2-LM",
-            "CanESM5",
             "MRI-ESM2-0",
-            "CNRM-ESM2-1",
-            "CESM2",
-            "BCC-CSM2-MR",
-            "ACCESS-ESM1-5",
-            "CMCC-ESM2",
-            "GFDL-ESM4",
+            "NorESM2-LM",
+            "UKESM1-0-LL",
         ],
+        # "CMIP6_holistic": [
+        #     "UKESM1-0-LL",
+        #     "MPI-ESM1-2-LR",
+        #     "IPSL-CM6A-LR",
+        #     "MIROC-ES2L",
+        #     "NorESM2-LM",
+        #     "CanESM5",
+        #     "MRI-ESM2-0",
+        #     "CNRM-ESM2-1",
+        #     "CESM2",
+        #     "BCC-CSM2-MR",
+        #     "ACCESS-ESM1-5",
+        #     "CMCC-ESM2",
+        #     "GFDL-ESM4",
+        # ],
     }
     scenario_opts = [
-        "1pctco2",
-        "1pctco2-cdr",
+        # "1pctco2",
+        # "1pctco2-cdr",
         "ssp119",
         "ssp126",
         "ssp245",
@@ -131,21 +116,15 @@ def cli_parser():
         "ssp460",
         "ssp534-over",
         "ssp585",
-        "manual-ssps",
-        "manual-1pctco2",
-        "historical",
-        "cross_experiment",
-        "holistic",
+        # "manual-ssps",
+        # "manual-1pctco2",
+        # "historical",
+        # "cross_experiment",
+        # "holistic",
     ]
     parser = argparse.ArgumentParser()
 
     parser.add_argument("models", nargs="+")
-    parser.add_argument(
-        "-e",
-        "--era",
-        choices=list(["CMIP5", "CMIP6"]),
-        default="CMIP6",
-    )
     parser.add_argument("-s", "--scenario", choices=scenario_opts, default="ssp585")
     parser.add_argument("-p", "--scenario_pars", choices=scenario_opts, default=None)
     parser.add_argument("--save", action=argparse.BooleanOptionalAction)
@@ -153,20 +132,17 @@ def cli_parser():
 
     args = parser.parse_args()
 
-    if args.scenario != "1pctco2" and args.era == "CMIP5":
-        raise ValueError("Only 1pctco2 scenario is available for CMIP5 era.")
-
     if args.scenario_pars is None:
         args.scenario_pars = "cross_experiment"
 
     for model in args.models:
-        if model not in model_list[args.era + "_" + args.scenario_pars]:
+        if model not in model_list["CMIP6_" + args.scenario_pars]:
             raise ValueError(
                 f"Wrong model name '{model}' for "
-                f"{args.era} era and {args.scenario_pars} scenario. "
-                f"Available models are: {model_list[args.era + '_' + args.scenario_pars]}"
+                f"CMIP6 era and {args.scenario_pars} scenario. "
+                f"Available models are: {model_list["CMIP6_" + args.scenario_pars]}"
             )
     # TODO: maybe have a table somewhere in git with all available models so I can just
-    # link to it?
+    # TODO: link to it?
 
-    return args.models, args.scenario, args.scenario_pars, args.era, args.save, args.npp
+    return args.models, args.scenario, args.scenario_pars, args.save, args.npp

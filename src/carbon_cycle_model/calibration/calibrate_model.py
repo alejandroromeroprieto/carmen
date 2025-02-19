@@ -1,8 +1,28 @@
 """
-Script to calibrate the carbon cycle emulator to a specific set of ESM output files.
+Script to calibrate individual fluxes for the carbon cycle emulator to a specific set of
+ESM output files.
 
-TODO: give an explanation on how this script works. (takes model and scenarios, and
-      trains fluxes based on esm data)
+In particular, this script does the following for each model specified in model_list:
+- Load the data for all specified experiments in experiment_list
+- Derive some pre-industrial quantities from this ESM data.
+- Run the calibration for all fluxes individually. This involves:
+    - Drawing different parameter value sets, starting from initial guesses specified
+      in initial_{flux}_guess_dim, and limited to the interval in {flux}_range.
+    - Calculating a similarity measure or "cost" between emulated fluxes with thse
+      parameter values and the corresponding ESM flux.
+    - Minimise this cost function varying the parameter values. This minimisation is done
+      in parallel, via the third-party optimparallel package.
+    - Plot some diagnostic plots for the calibration.
+    - Store best-fist parameter value set in 'OUT_DIR'.
+
+The fluxes to calibrate can be specified in 'fluxes_to_calibrate', which can be a subset
+of:
+- GPP (gross primary production)
+- litterfall
+- vegetation respiration
+- soil respiration
+- ocean carbon uptake
+- NPP (Net primary production)
 """
 
 import json
@@ -38,9 +58,9 @@ from carbon_cycle_model.land_component.boxes.utils import general_calibration_fu
 
 # Version number for the calibration. A different number will prevent produced data
 # overwriting old data.
-ccversion = 1
+CC_VERSION = 1
 
-scenario = "CMIP6"
+SCENARIO = "CMIP6"
 
 # List of ESMs to perform the calibration on. Possible options are:
 #  - ACCESS-ESM1-5
@@ -133,36 +153,37 @@ initial_oflux_guess_dim = np.array([55, 0.33, 0.05, -0.1])
 
 
 # Tolerance values for our calibration
-x_tol = 1e-5
-f_tol = 1e-5
+F_TOL = 1e-5
 
 # Number of decimal places to to for rounding parameter values
-nround = 8
+N_ROUND = 8
 
 # Get current folder path
-cwd = str(Path.cwd())
+CWD = str(Path.cwd())
 
 # Directory to store results
-out_dir = cwd + "/src/carbon_cycle_model/calibration/calibration_results"
+OUT_DIR = CWD + "/src/carbon_cycle_model/calibration/calibration_results"
 
 # Path and prefix to all input data files
-PREFIX = cwd + "/src/carbon_cycle_model/data/scenarios/sce_"
+PREFIX = CWD + "/src/carbon_cycle_model/data/scenarios/sce_"
 
 # Number of times we cycle through the optimization for each component
 # to try to avoid potential local minima:
-num_repeat = 20
-nsamp_gpp = num_repeat
-nsamp_lit = num_repeat
-nsamp_vres = num_repeat
-nsamp_sres = num_repeat
-nsamp_npp = num_repeat
-nsamp_docn = 1  # ocean function, and by extension its calibration, is relatively slower
+NUM_REPEAT = 20
+NMSAMP_GPP = NUM_REPEAT
+NMSAMP_LIT = NUM_REPEAT
+NMSAMP_VRES = NUM_REPEAT
+NMSAMP_SRES = NUM_REPEAT
+NMSAMP_NPP = NUM_REPEAT
+NMSAMP_DOCN = (
+    1  # ocean function, and by extension its calibration, is relatively slower
+)
 
 
-# Switch that allows either return of the coefficient gamma from lit_func (retcoef=True),
-# or return of litter flux gamma*V (retcoef=False). Determines which diagnostic is
+# Switch that allows either return of the coefficient gamma from lit_func (RETCOEF=True),
+# or return of litter flux gamma*V (RETCOEF=False). Determines which diagnostic is
 # plotted.
-retcoef = True
+RETCOEF = True
 
 esm_data = {}
 
@@ -178,9 +199,9 @@ for ind, model in enumerate(model_list):
     for experiment in experiment_list:
         # Number of years to use to determine the pre-industrial values
         if "1pctco2" in experiment:
-            pre_ind_average_length = 1
+            PRE_IND_AVERAGE_LENGTH = 1
         elif "ssp" in experiment:
-            pre_ind_average_length = 20
+            PRE_IND_AVERAGE_LENGTH = 20
         else:
             raise ValueError("Experiment not recognised")
 
@@ -190,7 +211,7 @@ for ind, model in enumerate(model_list):
             model,
             experiment,
             recalcEmis=True,
-            ninit=pre_ind_average_length,
+            ninit=PRE_IND_AVERAGE_LENGTH,
             smoothing_alg={"type": "butterworth", "pars": [1]},
         )
 
@@ -206,55 +227,55 @@ for ind, model in enumerate(model_list):
         esm_data,
         model,
         "cveg0",
-        nround,
+        N_ROUND,
     )
     model_pars["csoil0"] = get_general_average(
         esm_data,
         model,
         "csoil0",
-        nround,
+        N_ROUND,
     )
     model_pars["catm0"] = get_general_average(
         esm_data,
         model,
         "catm0",
-        nround,
+        N_ROUND,
     )
     model_pars["npp0"] = get_general_average(
         esm_data,
         model,
         "npp0",
-        nround,
+        N_ROUND,
     )
     model_pars["gpp0"] = get_general_average(
         esm_data,
         model,
         "gpp0",
-        nround,
+        N_ROUND,
     )
     model_pars["lu0"] = get_general_average(
         esm_data,
         model,
         "lu0",
-        nround,
+        N_ROUND,
     )
     model_pars["lit0"] = get_general_average(
         esm_data,
         model,
         "lit0",
-        nround,
+        N_ROUND,
     )
     model_pars["rh0"] = get_general_average(
         esm_data,
         model,
         "rh0",
-        nround,
+        N_ROUND,
     )
     model_pars["ra0"] = get_general_average(
         esm_data,
         model,
         "ra0",
-        nround,
+        N_ROUND,
     )
 
     # Make a list of individual fits, and use plot_diagnostic to make some plots.
@@ -269,11 +290,11 @@ for ind, model in enumerate(model_list):
         print("\t GPP")
 
         # number of parameters to calibrate: (gpp_sts, gpp_ste , gpp_lt, gpp_c_half)
-        npar = 4
+        NPAR = 4
 
         # Array with maximum and minimum (normalized) values for the parameters
-        parlo = np.zeros(npar)
-        parhi = np.ones(npar)
+        parlo = np.zeros(NPAR)
+        parhi = np.ones(NPAR)
 
         # Normalizer object normalizes the initial guess.
         # Subscripts '_bar' here refer to normalized quantities. Values will always be in
@@ -283,7 +304,7 @@ for ind, model in enumerate(model_list):
 
         # If low and high extremes of the parameter range are the same establish maximum
         # parameter value to 0
-        for i in range(npar):
+        for i in range(NPAR):
             if gpp_normaliser.pranges[i, 0] == gpp_normaliser.pranges[i, 1]:
                 parhi[i] = 0.0
 
@@ -303,8 +324,8 @@ for ind, model in enumerate(model_list):
             calibration_args,
             parlo,
             parhi,
-            attempts=nsamp_gpp,
-            ftol=f_tol,
+            attempts=NMSAMP_GPP,
+            ftol=F_TOL,
         )
 
         systime_gppend = systime.time()
@@ -322,10 +343,10 @@ for ind, model in enumerate(model_list):
         print("")
 
         # Add solution values to the output dictionary
-        model_pars["gpp_sts"] = round(gpp_sts, nround)
-        model_pars["gpp_ste"] = round(gpp_ste, nround)
-        model_pars["gpp_lt"] = round(gpp_lt, nround)
-        model_pars["gpp_c_half"] = round(gpp_c_half, nround)
+        model_pars["gpp_sts"] = round(gpp_sts, N_ROUND)
+        model_pars["gpp_ste"] = round(gpp_ste, N_ROUND)
+        model_pars["gpp_lt"] = round(gpp_lt, N_ROUND)
+        model_pars["gpp_c_half"] = round(gpp_c_half, N_ROUND)
 
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
@@ -345,14 +366,14 @@ for ind, model in enumerate(model_list):
             print("Making GPP plot data for:", model)
 
             conlabel = ["gpp_sts", "gpp_ste", "gpp_lt", "gpp_c_half"]
-            n4con = 50  # number of elements for contour plots in each axis
+            N4CON = 50  # number of elements for contour plots in each axis
 
             # Make contour plots for all four variables
             # (gpp_sts, gpp_ste, gpp_lt, gpp_c_half)
-            par1 = np.linspace(parlo[0], parhi[0], num=n4con, endpoint=True)
-            par2 = np.linspace(parlo[1], parhi[1], num=n4con, endpoint=True)
-            par3 = np.linspace(parlo[2], parhi[2], num=n4con, endpoint=True)
-            par4 = np.linspace(parlo[3], parhi[3], num=n4con, endpoint=True)
+            par1 = np.linspace(parlo[0], parhi[0], num=N4CON, endpoint=True)
+            par2 = np.linspace(parlo[1], parhi[1], num=N4CON, endpoint=True)
+            par3 = np.linspace(parlo[2], parhi[2], num=N4CON, endpoint=True)
+            par4 = np.linspace(parlo[3], parhi[3], num=N4CON, endpoint=True)
 
             # Lists to store data for plotting
             par1arr = []
@@ -405,19 +426,19 @@ for ind, model in enumerate(model_list):
             jarr.append(jj)
 
             # Save data for later diagnostic plots
-            name = "GPP"
+            FLUX_NAME = "GPP"
             xlist = [
                 esm_data[model][experiment]["time"],
                 esm_data[model][experiment]["dtglb"],
                 esm_data[model][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
-            title = [model + ", " + experiment, name]
+            title = [model + ", " + experiment, FLUX_NAME]
             esm_flux = esm_data[model][experiment]["gpp"]
 
-            # If the retcoef flag is True, divide by the relevant stock to obtain
+            # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
-            if retcoef:
+            if RETCOEF:
                 scc_gpp = scc_gpp / esm_data[model][experiment]["cveg"]
                 esm_flux = esm_flux / esm_data[model][experiment]["cveg"]
 
@@ -434,7 +455,7 @@ for ind, model in enumerate(model_list):
                 conlabel=conlabel,
                 xlabel=xlabel,
                 title=title,
-                name=name,
+                name=FLUX_NAME,
             )
 
             fit.append(fit_gpp)
@@ -448,11 +469,11 @@ for ind, model in enumerate(model_list):
         print("\t Litterfall")
 
         # number of parameters to calibrate: (lit_sts, lit_ste , lit_lt, lit_c_half)
-        npar = 4
+        NPAR = 4
 
         # Array with maximum and minimum (normalized) values for the parameters
-        parlo = np.zeros(npar)
-        parhi = np.ones(npar)
+        parlo = np.zeros(NPAR)
+        parhi = np.ones(NPAR)
 
         # Normalizer object normalizes the initial guess.
         # Subscripts '_bar' here refer to normalized quantities. Values will always be in
@@ -462,7 +483,7 @@ for ind, model in enumerate(model_list):
 
         # If low and high extremes of the parameter range are the same establish maximum
         # parameter value to 0
-        for i in range(npar):
+        for i in range(NPAR):
             if lit_normalizer.pranges[i, 0] == lit_normalizer.pranges[i, 1]:
                 parhi[i] = 0.0
 
@@ -482,8 +503,8 @@ for ind, model in enumerate(model_list):
             calibration_args,
             parlo,
             parhi,
-            attempts=nsamp_lit,
-            ftol=f_tol,
+            attempts=NMSAMP_LIT,
+            ftol=F_TOL,
         )
 
         systime_gppend = systime.time()
@@ -501,10 +522,10 @@ for ind, model in enumerate(model_list):
         print("")
 
         # Add solution values to the output dictionary
-        model_pars["lit_sts"] = round(lit_sts, nround)
-        model_pars["lit_ste"] = round(lit_ste, nround)
-        model_pars["lit_lt"] = round(lit_lt, nround)
-        model_pars["lit_c_half"] = round(lit_c_half, nround)
+        model_pars["lit_sts"] = round(lit_sts, N_ROUND)
+        model_pars["lit_ste"] = round(lit_ste, N_ROUND)
+        model_pars["lit_lt"] = round(lit_lt, N_ROUND)
+        model_pars["lit_c_half"] = round(lit_c_half, N_ROUND)
 
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
@@ -524,14 +545,14 @@ for ind, model in enumerate(model_list):
             print("Making litterfall plot data for:", model)
 
             conlabel = ["lit_sts", "lit_ste", "lit_lt", "lit_c_half"]
-            n4con = 50  # number of elements for contour plots in each axis
+            N4CON = 50  # number of elements for contour plots in each axis
 
             # Make contour plots for all four variables
             # (lit_sts, lit_ste, lit_lt, lit_c_half)
-            par1 = np.linspace(parlo[0], parhi[0], num=n4con, endpoint=True)
-            par2 = np.linspace(parlo[1], parhi[1], num=n4con, endpoint=True)
-            par3 = np.linspace(parlo[2], parhi[2], num=n4con, endpoint=True)
-            par4 = np.linspace(parlo[3], parhi[3], num=n4con, endpoint=True)
+            par1 = np.linspace(parlo[0], parhi[0], num=N4CON, endpoint=True)
+            par2 = np.linspace(parlo[1], parhi[1], num=N4CON, endpoint=True)
+            par3 = np.linspace(parlo[2], parhi[2], num=N4CON, endpoint=True)
+            par4 = np.linspace(parlo[3], parhi[3], num=N4CON, endpoint=True)
 
             # Lists to store data for plotting
             par1arr = []
@@ -584,19 +605,19 @@ for ind, model in enumerate(model_list):
             jarr.append(jj)
 
             # Save data for later diagnostic plots
-            name = "Litter"
+            FLUX_NAME = "Litter"
             xlist = [
                 esm_data[model][experiment]["time"],
                 esm_data[model][experiment]["dtglb"],
                 esm_data[model][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
-            title = [model + ", " + experiment, name]
+            title = [model + ", " + experiment, FLUX_NAME]
             esm_flux = esm_data[model][experiment]["lit"]
 
-            # If the retcoef flag is True, divide by the relevant stock to obtain
+            # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
-            if retcoef:
+            if RETCOEF:
                 scc_lit = scc_lit / esm_data[model][experiment]["cveg"]
                 esm_flux = esm_flux / esm_data[model][experiment]["cveg"]
 
@@ -613,7 +634,7 @@ for ind, model in enumerate(model_list):
                 conlabel=conlabel,
                 xlabel=xlabel,
                 title=title,
-                name=name,
+                name=FLUX_NAME,
             )
 
             fit.append(fit_litter)
@@ -627,11 +648,11 @@ for ind, model in enumerate(model_list):
         print("\t Vegetation respiration")
 
         # number of parameters to calibrate: (vres_sts, vres_ste , vres_lt, vres_c_half)
-        npar = 4
+        NPAR = 4
 
         # Array with maximum and minimum (normalized) values for the parameters
-        parlo = np.zeros(npar)
-        parhi = np.ones(npar)
+        parlo = np.zeros(NPAR)
+        parhi = np.ones(NPAR)
 
         # Normalizer object normalizes the initial guess.
         # Subscripts '_bar' here refer to normalized quantities. Values will always be in
@@ -641,7 +662,7 @@ for ind, model in enumerate(model_list):
 
         # If low and high extremes of the parameter range are the same establish maximum
         # parameter value to 0
-        for i in range(npar):
+        for i in range(NPAR):
             if vres_normalizer.pranges[i, 0] == vres_normalizer.pranges[i, 1]:
                 parhi[i] = 0.0
 
@@ -661,8 +682,8 @@ for ind, model in enumerate(model_list):
             calibration_args,
             parlo,
             parhi,
-            attempts=nsamp_vres,
-            ftol=f_tol,
+            attempts=NMSAMP_VRES,
+            ftol=F_TOL,
         )
 
         systime_gppend = systime.time()
@@ -680,10 +701,10 @@ for ind, model in enumerate(model_list):
         print("")
 
         # Add solution values to the output dictionary
-        model_pars["vres_sts"] = round(vres_sts, nround)
-        model_pars["vres_ste"] = round(vres_ste, nround)
-        model_pars["vres_lt"] = round(vres_lt, nround)
-        model_pars["vres_c_half"] = round(vres_c_half, nround)
+        model_pars["vres_sts"] = round(vres_sts, N_ROUND)
+        model_pars["vres_ste"] = round(vres_ste, N_ROUND)
+        model_pars["vres_lt"] = round(vres_lt, N_ROUND)
+        model_pars["vres_c_half"] = round(vres_c_half, N_ROUND)
 
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
@@ -703,14 +724,14 @@ for ind, model in enumerate(model_list):
             print("Making vegetation respiration plot data for:", model)
 
             conlabel = ["vres_sts", "vres_ste", "vres_lt", "vres_c_half"]
-            n4con = 50  # number of elements for contour plots in each axis
+            N4CON = 50  # number of elements for contour plots in each axis
 
             # Make contour plots for all four variables
             # (vres_sts, vres_ste, vres_lt, vres_c_half)
-            par1 = np.linspace(parlo[0], parhi[0], num=n4con, endpoint=True)
-            par2 = np.linspace(parlo[1], parhi[1], num=n4con, endpoint=True)
-            par3 = np.linspace(parlo[2], parhi[2], num=n4con, endpoint=True)
-            par4 = np.linspace(parlo[3], parhi[3], num=n4con, endpoint=True)
+            par1 = np.linspace(parlo[0], parhi[0], num=N4CON, endpoint=True)
+            par2 = np.linspace(parlo[1], parhi[1], num=N4CON, endpoint=True)
+            par3 = np.linspace(parlo[2], parhi[2], num=N4CON, endpoint=True)
+            par4 = np.linspace(parlo[3], parhi[3], num=N4CON, endpoint=True)
 
             # Lists to store data for plotting
             par1arr = []
@@ -763,19 +784,19 @@ for ind, model in enumerate(model_list):
             jarr.append(jj)
 
             # Save data for later diagnostic plots
-            name = "sres"
+            FLUX_NAME = "sres"
             xlist = [
                 esm_data[model][experiment]["time"],
                 esm_data[model][experiment]["dtglb"],
                 esm_data[model][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
-            title = [model + ", " + experiment, name]
+            title = [model + ", " + experiment, FLUX_NAME]
             esm_flux = esm_data[model][experiment]["ra"]
 
-            # If the retcoef flag is True, divide by the relevant stock to obtain
+            # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
-            if retcoef:
+            if RETCOEF:
                 scc_vres = scc_vres / esm_data[model][experiment]["cveg"]
                 esm_flux = esm_flux / esm_data[model][experiment]["cveg"]
 
@@ -792,7 +813,7 @@ for ind, model in enumerate(model_list):
                 conlabel=conlabel,
                 xlabel=xlabel,
                 title=title,
-                name=name,
+                name=FLUX_NAME,
             )
 
             fit.append(fit_vres)
@@ -806,11 +827,11 @@ for ind, model in enumerate(model_list):
         print("\t Soil respiration")
 
         # number of parameters to calibrate: (sres_sts, sres_ste , sres_lt, sres_c_half)
-        npar = 4
+        NPAR = 4
 
         # Array with maximum and minimum (normalized) values for the parameters
-        parlo = np.zeros(npar)
-        parhi = np.ones(npar)
+        parlo = np.zeros(NPAR)
+        parhi = np.ones(NPAR)
 
         # Normalizer object normalizes the initial guess.
         # Subscripts '_bar' here refer to normalized quantities. Values will always be in
@@ -820,7 +841,7 @@ for ind, model in enumerate(model_list):
 
         # If low and high extremes of the parameter range are the same establish maximum
         # parameter value to 0
-        for i in range(npar):
+        for i in range(NPAR):
             if sres_normalizer.pranges[i, 0] == sres_normalizer.pranges[i, 1]:
                 parhi[i] = 0.0
 
@@ -840,8 +861,8 @@ for ind, model in enumerate(model_list):
             calibration_args,
             parlo,
             parhi,
-            attempts=nsamp_sres,
-            ftol=f_tol,
+            attempts=NMSAMP_SRES,
+            ftol=F_TOL,
         )
 
         systime_gppend = systime.time()
@@ -859,10 +880,10 @@ for ind, model in enumerate(model_list):
         print("")
 
         # Add solution values to the output dictionary
-        model_pars["sres_sts"] = round(sres_sts, nround)
-        model_pars["sres_ste"] = round(sres_ste, nround)
-        model_pars["sres_lt"] = round(sres_lt, nround)
-        model_pars["sres_c_half"] = round(sres_c_half, nround)
+        model_pars["sres_sts"] = round(sres_sts, N_ROUND)
+        model_pars["sres_ste"] = round(sres_ste, N_ROUND)
+        model_pars["sres_lt"] = round(sres_lt, N_ROUND)
+        model_pars["sres_c_half"] = round(sres_c_half, N_ROUND)
 
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
@@ -882,14 +903,14 @@ for ind, model in enumerate(model_list):
             print("Making soil respiration plot data for:", model)
 
             conlabel = ["sres_sts", "sres_ste", "sres_lt", "sres_c_half"]
-            n4con = 50  # number of elements for contour plots in each axis
+            N4CON = 50  # number of elements for contour plots in each axis
 
             # Make contour plots for all four variables
             # (sres_sts, sres_ste, sres_lt, sres_c_half)
-            par1 = np.linspace(parlo[0], parhi[0], num=n4con, endpoint=True)
-            par2 = np.linspace(parlo[1], parhi[1], num=n4con, endpoint=True)
-            par3 = np.linspace(parlo[2], parhi[2], num=n4con, endpoint=True)
-            par4 = np.linspace(parlo[3], parhi[3], num=n4con, endpoint=True)
+            par1 = np.linspace(parlo[0], parhi[0], num=N4CON, endpoint=True)
+            par2 = np.linspace(parlo[1], parhi[1], num=N4CON, endpoint=True)
+            par3 = np.linspace(parlo[2], parhi[2], num=N4CON, endpoint=True)
+            par4 = np.linspace(parlo[3], parhi[3], num=N4CON, endpoint=True)
 
             # Lists to store data for plotting
             par1arr = []
@@ -942,19 +963,19 @@ for ind, model in enumerate(model_list):
             jarr.append(jj)
 
             # Save data for later diagnostic plots
-            name = "sres"
+            FLUX_NAME = "sres"
             xlist = [
                 esm_data[model][experiment]["time"],
                 esm_data[model][experiment]["dtglb"],
                 esm_data[model][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
-            title = [model + ", " + experiment, name]
+            title = [model + ", " + experiment, FLUX_NAME]
             esm_flux = esm_data[model][experiment]["rh"]
 
-            # If the retcoef flag is True, divide by the relevant stock to obtain
+            # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
-            if retcoef:
+            if RETCOEF:
                 scc_sres = scc_sres / esm_data[model][experiment]["csoil"]
                 esm_flux = esm_flux / esm_data[model][experiment]["csoil"]
 
@@ -971,7 +992,7 @@ for ind, model in enumerate(model_list):
                 conlabel=conlabel,
                 xlabel=xlabel,
                 title=title,
-                name=name,
+                name=FLUX_NAME,
             )
 
             fit.append(fit_sres)
@@ -985,11 +1006,11 @@ for ind, model in enumerate(model_list):
         print("\t NPP")
 
         # number of parameters to calibrate: (npp_sts, npp_ste , npp_lt, npp_c_half)
-        npar = 4
+        NPAR = 4
 
         # Array with maximum and minimum (normalized) values for the parameters
-        parlo = np.zeros(npar)
-        parhi = np.ones(npar)
+        parlo = np.zeros(NPAR)
+        parhi = np.ones(NPAR)
 
         # Normalizer object normalizes the initial guess.
         # Subscripts '_bar' here refer to normalized quantities. Values will always be in
@@ -999,7 +1020,7 @@ for ind, model in enumerate(model_list):
 
         # If low and high extremes of the parameter range are the same establish maximum
         # parameter value to 0
-        for i in range(npar):
+        for i in range(NPAR):
             if npp_normalizer.pranges[i, 0] == npp_normalizer.pranges[i, 1]:
                 parhi[i] = 0.0
 
@@ -1019,8 +1040,8 @@ for ind, model in enumerate(model_list):
             calibration_args,
             parlo,
             parhi,
-            attempts=nsamp_npp,
-            ftol=f_tol,
+            attempts=NMSAMP_NPP,
+            ftol=F_TOL,
         )
 
         systime_gppend = systime.time()
@@ -1038,10 +1059,10 @@ for ind, model in enumerate(model_list):
         print("")
 
         # Add solution values to the output dictionary
-        model_pars["npp_sts"] = round(npp_sts, nround)
-        model_pars["npp_ste"] = round(npp_ste, nround)
-        model_pars["npp_lt"] = round(npp_lt, nround)
-        model_pars["npp_c_half"] = round(npp_c_half, nround)
+        model_pars["npp_sts"] = round(npp_sts, N_ROUND)
+        model_pars["npp_ste"] = round(npp_ste, N_ROUND)
+        model_pars["npp_lt"] = round(npp_lt, N_ROUND)
+        model_pars["npp_c_half"] = round(npp_c_half, N_ROUND)
 
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
@@ -1061,14 +1082,14 @@ for ind, model in enumerate(model_list):
             print("Making npp plot data for:", model)
 
             conlabel = ["npp_sts", "npp_ste", "npp_lt", "npp_c_half"]
-            n4con = 50  # number of elements for contour plots in each axis
+            N4CON = 50  # number of elements for contour plots in each axis
 
             # Make contour plots for all four variables
             # (npp_sts, npp_ste, npp_lt, npp_c_half)
-            par1 = np.linspace(parlo[0], parhi[0], num=n4con, endpoint=True)
-            par2 = np.linspace(parlo[1], parhi[1], num=n4con, endpoint=True)
-            par3 = np.linspace(parlo[2], parhi[2], num=n4con, endpoint=True)
-            par4 = np.linspace(parlo[3], parhi[3], num=n4con, endpoint=True)
+            par1 = np.linspace(parlo[0], parhi[0], num=N4CON, endpoint=True)
+            par2 = np.linspace(parlo[1], parhi[1], num=N4CON, endpoint=True)
+            par3 = np.linspace(parlo[2], parhi[2], num=N4CON, endpoint=True)
+            par4 = np.linspace(parlo[3], parhi[3], num=N4CON, endpoint=True)
 
             # Lists to store data for plotting
             par1arr = []
@@ -1121,19 +1142,19 @@ for ind, model in enumerate(model_list):
             jarr.append(jj)
 
             # Save data for later diagnostic plots
-            name = "npp"
+            FLUX_NAME = "npp"
             xlist = [
                 esm_data[model][experiment]["time"],
                 esm_data[model][experiment]["dtglb"],
                 esm_data[model][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
-            title = [model + ", " + experiment, name]
+            title = [model + ", " + experiment, FLUX_NAME]
             esm_flux = esm_data[model][experiment]["npp"]
 
-            # If the retcoef flag is True, divide by the relevant stock to obtain
+            # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
-            if retcoef:
+            if RETCOEF:
                 scc_npp = scc_npp / esm_data[model][experiment]["cveg"]
                 esm_flux = esm_flux / esm_data[model][experiment]["cveg"]
 
@@ -1150,7 +1171,7 @@ for ind, model in enumerate(model_list):
                 conlabel=conlabel,
                 xlabel=xlabel,
                 title=title,
-                name=name,
+                name=FLUX_NAME,
             )
 
             fit.append(fit_npp)
@@ -1166,17 +1187,17 @@ for ind, model in enumerate(model_list):
         # scenarios, we can get numerical instability in the model predictions for
         # ocean carbon flux. This is a feature of IMOGEN and the implementation of this
         # in scmpy. To resolve this, follow IMOGEN and interpolate to finer time
-        # resolution in the SCC, with a specified timestep dtime0. A value of 0.1 years
+        # resolution in the SCC, with a specified timestep DTIME_0. A value of 0.1 years
         # seems to be ok. This makes optimizing for docn rather slow.
 
         print("")
         print("\t OFLUX")
 
-        npar = 4
-        dtime0 = 0.03  # Same as the one used to run the model prognostically
+        NPAR = 4
+        DTIME_0 = 0.03  # Same as the one used to run the model prognostically
         # NOTE - for docn, fminBoundedSample is slow, and since resampling the optimized
         # solution invariably gives the same solution for these variables, do not
-        # resample, so set nsamp_docn=0.
+        # resample, so set NMSAMP_DOCN=0.
 
         docn_normalizer = Normalizer(pranges=oflux_range)
 
@@ -1184,13 +1205,13 @@ for ind, model in enumerate(model_list):
 
         p0_dim = oflux_range.mean(axis=1)
         p0_bar = docn_normalizer.normalise(initial_oflux_guess_dim)
-        parlo = np.zeros(npar)
-        parhi = np.ones(npar)
-        for i in range(npar):
+        parlo = np.zeros(NPAR)
+        parhi = np.ones(NPAR)
+        for i in range(NPAR):
             if docn_normalizer.pranges[i, 0] == docn_normalizer.pranges[i, 1]:
                 parhi[i] = 0.0
 
-        calibration_args = (docn_normalizer, esm_data, model, dtime0)
+        calibration_args = (docn_normalizer, esm_data, model, DTIME_0)
 
         print("Please be patient, this step takes a while...")
         # raise AssertionError('Stop for debugging...')
@@ -1202,18 +1223,18 @@ for ind, model in enumerate(model_list):
             calibration_args,
             parlo,
             parhi,
-            attempts=nsamp_docn,
-            ftol=f_tol,
+            attempts=NMSAMP_DOCN,
+            ftol=F_TOL,
         )
 
         systime_docnend = systime.time()
 
         docn, docnfac, ocntemp, docntemp = pstar = docn_normalizer.inv(p_bar)
 
-        model_pars["docn"] = round(docn, nround)
-        model_pars["docnfac"] = round(docnfac, nround)
-        model_pars["ocntemp"] = round(ocntemp, nround)
-        model_pars["docntemp"] = round(docntemp, nround)
+        model_pars["docn"] = round(docn, N_ROUND)
+        model_pars["docnfac"] = round(docnfac, N_ROUND)
+        model_pars["ocntemp"] = round(ocntemp, N_ROUND)
+        model_pars["docntemp"] = round(docntemp, N_ROUND)
 
         print("")
         print("\t =================  OCEAN FLUX SOLUTIONS  ================")
@@ -1229,12 +1250,12 @@ for ind, model in enumerate(model_list):
                 esm_data[model][experiment]["time"][-1]
                 - esm_data[model][experiment]["time"][0]
             )
-            / dtime0
+            / DTIME_0
         )
         for experiment in experiment_list:
             scc_oflux = docn_func(
                 esm_data[model][experiment]["catm0"],
-                dtime0,
+                DTIME_0,
                 num_steps,
                 docn,
                 docnfac,
@@ -1248,7 +1269,7 @@ for ind, model in enumerate(model_list):
             print("Making OFLUX plot data for:", model)
             conlabel = ["docn", "docnfac", "ocntemp", "docntemp"]
 
-            n4con = 15  # slow, so don't do too many
+            N4CON = 15  # slow, so don't do too many
 
             par1arr = []
             par2arr = []
@@ -1257,12 +1278,12 @@ for ind, model in enumerate(model_list):
 
             # Contour par1 and par2
             jj = [0, 1]
-            par1 = np.linspace(parlo[0], parhi[0], num=n4con, endpoint=True)
-            par2 = np.linspace(parlo[1], parhi[1], num=n4con, endpoint=True)
+            par1 = np.linspace(parlo[0], parhi[0], num=N4CON, endpoint=True)
+            par2 = np.linspace(parlo[1], parhi[1], num=N4CON, endpoint=True)
 
             gcm_values = [
                 esm_data[model][experiment]["catm0"],
-                dtime0,
+                DTIME_0,
                 num_steps,
                 esm_data[model][experiment]["time"],
                 esm_data[model][experiment]["catm"],
@@ -1286,12 +1307,12 @@ for ind, model in enumerate(model_list):
 
             # Contour par1 and par2
             jj = [2, 3]
-            par1 = np.linspace(parlo[0], parhi[0], num=n4con, endpoint=True)
-            par2 = np.linspace(parlo[1], parhi[1], num=n4con, endpoint=True)
+            par1 = np.linspace(parlo[0], parhi[0], num=N4CON, endpoint=True)
+            par2 = np.linspace(parlo[1], parhi[1], num=N4CON, endpoint=True)
 
             gcm_values = [
                 esm_data[model][experiment]["catm0"],
-                dtime0,
+                DTIME_0,
                 num_steps,
                 esm_data[model][experiment]["time"],
                 esm_data[model][experiment]["catm"],
@@ -1315,14 +1336,14 @@ for ind, model in enumerate(model_list):
             jarr.append(jj)
 
             #####
-            name = r"$f_o$"
+            FLUX_NAME = r"$f_o$"
             xlist = [
                 esm_data[model][experiment]["time"],
                 esm_data[model][experiment]["dtglb"],
                 esm_data[model][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
-            title = [model + ", " + experiment, name]
+            title = [model + ", " + experiment, FLUX_NAME]
 
             gcm = esm_data[model][experiment]["oflux"]
 
@@ -1339,7 +1360,7 @@ for ind, model in enumerate(model_list):
                 conlabel=conlabel,
                 xlabel=xlabel,
                 title=title,
-                name=name,
+                name=FLUX_NAME,
             )
 
             fit.append(fit_oflux)
@@ -1351,24 +1372,23 @@ for ind, model in enumerate(model_list):
     # Make and save diagnostic plots
     for i, experiment in enumerate(experiment_list):
         outname = (
-            "ALL/optscc_v"
-            + "%s" % ccversion
+            f"ALL/optscc_v{CC_VERSION}"
             + "_cmip6_"
-            + scenario.lower()
+            + SCENARIO.lower()
             + "_"
             + model
             + "_general_"
             + experiment
             + ".pdf"
         )
-        outplot = os.path.join(out_dir, outname)
+        outplot = os.path.join(OUT_DIR, outname)
 
         # Make all sub-directories for outplot file if they don't already exist
         o = make_all_dirs(outplot)
         print("outplot: ", outplot)
 
         plot_diagnostic(
-            out_dir,
+            OUT_DIR,
             esm_data[model][experiment],
             fit[i :: len(experiment_list)],
             outplot=outplot,
@@ -1378,11 +1398,11 @@ for ind, model in enumerate(model_list):
         )
 
     # Save dict of calibrated parameters
-    outname = scenario.lower() + "/model_pars_" + model + ".txt"
-    txtfile = os.path.join(out_dir, outname)
+    outname = SCENARIO.lower() + "/model_pars_" + model + ".txt"
+    txtfile = os.path.join(OUT_DIR, outname)
     o = make_all_dirs(txtfile)
 
-    with open(txtfile, "w") as ofile:
+    with open(txtfile, "w", encoding="utf-8") as ofile:
         json.dump(model_pars, ofile)
 
     print("Written dictionary to json txt file:", txtfile)

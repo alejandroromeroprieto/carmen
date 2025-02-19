@@ -1,33 +1,47 @@
+"""
+Example script on how to use the carbon cycle emulator.
+
+It does the following:
+- Initialise the emulator from one of the saved configurations.
+- Load data from the ESM corresponding to the loaded configuration.
+- Run the emulator via its single step function, as long as the ESM data extends.
+- Interpolate results back to the yearly resolution of the ESM data.
+- Create some diagnostic plots about the results.
+"""
+
 from pathlib import Path
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 from carbon_cycle_model.carbon_cycle_model import CarbonCycle
 from carbon_cycle_model.utils import load_esm_data
-from carbon_cycle_model.constants import PPM2GT, PARS_DIR, SCEN_DIR
+from carbon_cycle_model.constants import SCEN_DIR
 
 
-dt_model = 0.05
-dt_model_ocean = 0.05
+DT_MODEL = 0.05
+DT_MODEL_OCEAN = 0.05
 
-model = "UKESM1-0-LL"
-scenario = "ssp585"
+MODEL_NAME = "UKESM1-0-LL"
+SCENARIO = "ssp585"
 
-num_steps = int(1/dt_model)
+NUM_STEPS = int(1 / DT_MODEL)
 
-if 1 % dt_model != 0:
+if 1 % DT_MODEL != 0:
     print(
         "WARNING: model timestep is not an exact divisor of 1 year"
         " Bad things may happen due to timestep mismatch"
     )
 
 cc_emulator = CarbonCycle(
-    {"model": "UKESM1-0-LL", "scenario": scenario}, dt_model, dt_model_ocean, **{}
+    {"model": "UKESM1-0-LL", "scenario": SCENARIO},
+    DT_MODEL,
+    DT_MODEL_OCEAN,
+    npp_flag=True,
+    **{},
 )
 
 # Load diagnosed ESM data from the data dir
-data_file = Path(__file__).parent / SCEN_DIR / f"sce_{model}_{scenario}.txt"
+data_file = Path(__file__).parent / SCEN_DIR / f"sce_{MODEL_NAME}_{SCENARIO}.txt"
 print("\nLoading ESM data from: ", data_file)
 
 esm_data = load_esm_data(
@@ -47,7 +61,7 @@ esm_data = load_esm_data(
 # guessing that FaIR will want to feed its own data on its own timesteps, so that may not
 # be a good idea. Let's wait and see how FaIR does it first.
 for i in range(len(esm_data.time)):  # Assuming esm data is yearly
-    for j in range(num_steps):
+    for j in range(NUM_STEPS):
         new_input = {
             "emis": esm_data.gcmemis[i],
             "dtocn": esm_data.dtocn[i],
@@ -61,10 +75,7 @@ for i in range(len(esm_data.time)):  # Assuming esm data is yearly
         if isinstance(esm_data.fcvegoutcsoilin, np.ndarray):
             new_input.update({"fcvs": esm_data.fcvegoutcsoilin[i]})
 
-        output = cc_emulator.run_one_step(new_input, npp_flag=True)
+        cc_emulator.run_one_step(new_input)
 
-# plt.plot(cc_emulator.time, cc_emulator.land.gpp)
-# plt.show()
-# print(len(esm_data.time), num_steps_per_year, len(esm_data.time) * num_steps_per_year, len(output.cveg))
-# print(len(output.time))
-cc_emulator.create_plots(model, output, True)
+cc_emulator.interpolate_results(esm_data.time)
+cc_emulator.create_plots(MODEL_NAME)

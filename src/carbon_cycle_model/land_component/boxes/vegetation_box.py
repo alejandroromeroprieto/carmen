@@ -1,15 +1,12 @@
 """
 Vegetation box code.
 
-This box keeps track of its own carbon stock, and calculates
+This box keeps track of the carbon content in vegetation, and calculates
 four associated fluxes:
     - get_vres(temp_ano, catm): vegetation (autotrophic) respiration (GtC/y).
     - get_gpp(temp_ano, catm): Gross primary production (GtC/y).
     - get_npp(temp_ano, catm): net primary production (GtC/y).
     - get_litterfall(temp_ano, catm): litterfall (GtC/y).
-where:
-    - temp_ano: temperature anomaly. (kelvin/celsius)
-    - catm: atmospheric concentration of caron (ppm)
 """
 
 from carbon_cycle_model.land_component.boxes.abstract_box import AbstractLandBox
@@ -54,7 +51,14 @@ class VegetationBox(AbstractLandBox):
         self.lit_t_l = kwargs.get("lit_t_l", defaults.LIT_T_L)
 
     def get_vres(self, temp_ano, catm):
-        """Vegetation respiration coefficient."""
+        """
+        Vegetation respiration coefficient. It should be multiplied by the vegetation
+        carbon content to obtain the total vegetation respiration flux.
+
+        input:
+        - temp_ano: temperature anomaly from pre-industrial (kelvin/celsius).
+        - catm: atmospheric concentration of carbon dioxide (ppm).
+        """
 
         return general_calibration_fun(
             self.vres0_par,
@@ -70,7 +74,13 @@ class VegetationBox(AbstractLandBox):
         )
 
     def get_gpp(self, temp_ano, catm):
-        """Gross primary production."""
+        """
+        Gross primary production.
+
+        input:
+        - temp_ano: temperature anomaly from pre-industrial (kelvin/celsius).
+        - catm: atmospheric concentration of carbon dioxide (ppm).
+        """
 
         return general_calibration_fun(
             self.gpp0,
@@ -86,7 +96,13 @@ class VegetationBox(AbstractLandBox):
         )
 
     def get_npp(self, temp_ano, catm):
-        """Net primary production. (GPP in vres in theory)."""
+        """
+        Net primary production. In theory, this should be equal to GPP - vres.
+
+        input:
+        - temp_ano: temperature anomaly from pre-industrial (kelvin/celsius).
+        - catm: atmospheric concentration of carbon dioxide (ppm).
+        """
 
         return general_calibration_fun(
             self.npp0,
@@ -102,7 +118,14 @@ class VegetationBox(AbstractLandBox):
         )
 
     def get_litterfall(self, temp_ano, catm):
-        """Litterfall. (GPP in vres in theory)."""
+        """
+        Litterfall coefficient. It should be multiplied by the vegetation carbon content
+        to obtain the total litterfall flux.
+
+        input:
+        - temp_ano: temperature anomaly from pre-industrial (kelvin/celsius).
+        - catm: atmospheric concentration of carbon dioxide (ppm).
+        """
 
         return general_calibration_fun(
             self.lit0_par,

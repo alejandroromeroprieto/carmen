@@ -1,11 +1,13 @@
 """
-Script gathering miscelaneous utilities used in the model.
+File to store any auxiliary functions to the carbon cycle model that are not
+stored somehwere else.
 """
+
+import os
 
 import numpy as np
 import scipy
 from scipy.signal import savgol_filter
-import os
 
 from carbon_cycle_model.constants import KELVIN_0, OCEAN_FRAC, PPM2GT
 
@@ -47,11 +49,19 @@ def calc_emissions(
     smoothing_pars={"type": "butterworth", "pars": [5]},
 ):
     """
-    This estimates the total emissions needed to conserve CO2 given land and ocean
-    stores. Can be noisy, so smoothing is recommended.
+    This estimates the total emissions needed to conserve carbon across atmosphere,
+    land and ocean stores. Can be noisy, so smoothing is recommended.
 
-    To estimate, we calculate the derivative of the difference in C02 quantities
+    To estimate, we calculate the derivative of the difference in carbon quantities
     (summed up across atmosphere, land and ocean) at each timepoint.
+
+    input:
+    - time: array with time poins to use. (years)
+    - catm: atmospheric CO2 concentrations (ppm)
+    - cveg: carbon content of the vegetation pool. (GtC)
+    - csoil: carbon content of the soil pool. (GtC)
+    - oflux: carbon uptake by the ocean (positive into ocean). (GtC)
+    - smoothing_pars: parameters describing the smoothing to perform on the data.
     """
     # This is a cumulative integral calculating the total historical carbon uptake by the
     # ocean at each timestep
@@ -74,14 +84,32 @@ def calc_emissions(
 
 
 def smooth(x, cutoff=30, padlen=None):
-    "Entry point for butterworth smoothing."
+    """
+    Entry point for butterworth smoothing.
+
+    input:
+    - x: data array to apply smoothing to.
+    - cutoff: cutoff period above which the butterworth filter will delete,
+    data, considering it as noise.
+    - pad_len: length of the padding to apply to the data array.
+
+    return: array with smoothed data.
+    """
     if padlen is None:
         padlen = min([cutoff, int(x.shape[0] / 2)])
     return butterworth(x, cutoff, padlen=padlen)
 
 
 def predict_linear_fit(y, new_x):
-    "Predict values of y in the new range of X values with a linear fit"
+    """
+    Predict values of y in the new range of x values with a linear fit. Used for padding.
+
+    input:
+    - y: data to extend:
+    - new_x: array with new x values where the linear fit should be applied.
+
+    return: array with linear projections for y over new_x.
+    """
     if y.ndim != 1:
         raise AssertionError(f"Y is {y.ndim} but should be a vector")
     ny = y.shape[0]
@@ -91,28 +119,45 @@ def predict_linear_fit(y, new_x):
 
 
 def use_linear_trend_to_extend_ends_1d(y, padlen):
-    "Add padding and call predict_linear_fit at both halves of the y vector"
+    """
+    Add padding to a data array andby calling predict_linear_fit at both halves
+    of the y vector.
+
+    input:
+    - y: data array to extend.
+    - padlen: length of the padding to apply.
+
+    return: extended data array with the padding.
+    """
     if y.ndim != 1:
         raise AssertionError(f"Array must be 1d but is shape {y.ndim}")
     if padlen is None or padlen == 0:
         return y
-    else:
-        if 2 * padlen > y.shape[0]:
-            raise AssertionError(
-                f"padlen = {padlen} but this cannot be greater"
-                f"than half length of y which is {y.shape[0] / 2.0}"
-            )
-        y1 = predict_linear_fit(y[0:padlen], np.linspace(-padlen, -1, padlen))
-        y2 = predict_linear_fit(
-            y[-padlen:], np.linspace(padlen, 2 * padlen - 1, padlen)
+
+    if 2 * padlen > y.shape[0]:
+        raise AssertionError(
+            f"padlen = {padlen} but this cannot be greater"
+            f"than half length of y which is {y.shape[0] / 2.0}"
         )
-        return np.concatenate((y1, y, y2))
+    y1 = predict_linear_fit(y[0:padlen], np.linspace(-padlen, -1, padlen))
+    y2 = predict_linear_fit(
+        y[-padlen:], np.linspace(padlen, 2 * padlen - 1, padlen)
+    )
+    return np.concatenate((y1, y, y2))
 
 
 def use_linear_trend_to_extend_ends(y, padlen, axis=0):
     """
     Flat data to 1D if dimension is larger than 1D, and then apply
     use_linear_trend_to_extend_ends_1d.
+
+    input:
+    - y: data array to extend.
+    - padlen: length of the padding to apply.
+    - axis: axis to extend.
+
+    return: extended data array with the padding.
+
     """
     if y.ndim < 2:
         return use_linear_trend_to_extend_ends_1d(y, padlen)
@@ -123,12 +168,25 @@ def use_linear_trend_to_extend_ends(y, padlen, axis=0):
 
 def butterworth(x, period, axis=-1, order=4, padlen=3 * (4 + 1), high_pass=False):
     """
+    Apply a butterworth filter to the data.
+
     High values for order (eg 8), give more end effects, while a default value of 4 seems
     ok. Default padlen=3*(4+1) here, since we follow scipy.signal.filtfilt, which also
     implements padding. This assumes default length of 3*max(len(a),len(b)) where b,
     a = scipy.signal.butter(order, wn). Here one finds len(a)=len(b)=order+1, hence
     default padlen=3*(4+1) above. Higher period for cutoff -> Smaller frequencies for
     cutoff -> more higher frequencies are dropped -> more smoothing.
+
+    input:
+    - x: data array to smooth
+    - period: cutoff period above which the butterworth filter will filter data.
+    - axis: axis of the data to apply smoothing.
+    - order: polynomial orders for the butterworth filter.
+    - padlen: length of the padding to apply.
+    - high_pass: whether to apply a high pass filter (letting high frequencies through),
+                 as opposed to a low pass filter (letting tlow frequencies through).
+
+    return: data with a low_pass (or high pass) filter applied to it.
     """
     if period <= 1:
         ans = x
@@ -183,6 +241,12 @@ def apply_smoothing(data, smoothing_pars):
     requires two: one of the the size of the rolling window of points to evaluate
     and a second for the order of the polynomial to use to approximate them.
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.savgol_filter.html)
+
+    input:
+    - data: data array to apply the smoothing to.
+    - smoothing pars: dictionary descrining the type and strength of smoothing to apply.
+
+    return: array with smoothed data.
     """
     if smoothing_pars["type"] == "butterworth":
         smoothed_data = smooth(data, smoothing_pars["pars"][0])
@@ -202,13 +266,13 @@ def load_esm_data(
     smoothing_pars={"type": "butterworth", "pars": [1]},
 ):
     """
-    Read in ESM data from an existing file at 'esm_data_file'.
+    Return a Data object with the ESM data from an existing file at 'esm_data_file'.
 
     These files contain lots of global mean ESM diagnostics for the carbon cycle in
     column-formatted text format, with each row corresponding to a yearly mean.
     They are read with np.genfromtxt, and the output is written to a 'Data' object
-    (see above) with name 'gcm' here.
-    Attributes of this objects are things like 'gcm.time', 'gcm.catm' or 'gcm.npp'.
+    (see above) with name 'gcm' here. Data then can be accessed as attributes of the
+    object, such as 'gcm.time', 'gcm.catm' or 'gcm.npp'.
 
     INPUT
     esm_data_file: String, full path to the input file, eg sum4_MRI-ESM1.txt
@@ -217,7 +281,7 @@ def load_esm_data(
     ocean_frac:  Float, fraction of the earth surface covered by oceans. Default 0.710369
                  is the HadCM3 ocean_frac. This value was actully used in calibration for
                  all models. ocean_frac is used to estimate the global mean ocean near
-                 surface temperature from input Tglb and Tland (Ben's data only has these)
+                 surface temperature from input Tglb and Tland.
     ninit:       Integer, the number of initial time points (years) for establishing a
                  temperature baseline againt which we define the anomalies of surface and
                  ocean.
@@ -270,7 +334,7 @@ def load_esm_data(
                      which is not covered by any of the fluxes above.
     """
 
-    with open(esm_data_file, "r") as f1:
+    with open(esm_data_file, "r", encoding="utf-8") as f1:
         esm_data = np.genfromtxt(f1, names=True)
 
     gcm_time = esm_data["time"]
@@ -363,7 +427,7 @@ def load_esm_data(
 
 
 def make_all_dirs(fullfilename):
-    "Create necessary directories to host fullfilename."
+    "Create necessary directories to host 'fullfilename'."
     dirarr = fullfilename.split("/")
     dirarr = dirarr[1:-1]
     subdir = ""
@@ -372,4 +436,4 @@ def make_all_dirs(fullfilename):
         if not os.path.exists(subdir):
             print("making dir: ", subdir)
             os.makedirs(subdir)
-    return 1
+    return 0
