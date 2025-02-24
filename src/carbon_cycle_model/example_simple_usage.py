@@ -33,7 +33,10 @@ if 1 % DT_MODEL != 0:
     )
 
 cc_emulator = CarbonCycle(
+    # if you wanna use ESM scenario data
     {"model": "UKESM1-0-LL", "scenario": SCENARIO},
+    # if you want to run without any pre-loaded scenario
+    # {"model": "UKESM1-0-LL", "initial_year": 1850, "final_year": 2100},
     DT_MODEL,
     DT_MODEL_OCEAN,
     npp_flag=True,
@@ -41,7 +44,15 @@ cc_emulator = CarbonCycle(
 )
 
 # Load diagnosed ESM data from the data dir
-data_file = Path(__file__).parent / SCEN_DIR / f"sce_{MODEL_NAME}_{SCENARIO}.txt"
+
+
+# Load diagnosed ESM data from the data dir
+if MODEL_NAME == "CNRM-ESM2-1" or MODEL_NAME == "IPSL-CM6A-LR":
+    scen_to_use = SCEN_DIR + "/detrended_wrt_decade"
+else:
+    scen_to_use = SCEN_DIR
+
+data_file = Path(__file__).parent / scen_to_use / f"sce_{MODEL_NAME}_{SCENARIO}.txt"
 print("\nLoading ESM data from: ", data_file)
 
 esm_data = load_esm_data(

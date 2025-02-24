@@ -166,6 +166,9 @@ OUT_DIR = CWD + "/src/carbon_cycle_model/calibration/calibration_results"
 
 # Path and prefix to all input data files
 PREFIX = CWD + "/src/carbon_cycle_model/data/scenarios/sce_"
+PREFIX_DETRENDED = (
+    CWD + "/src/carbon_cycle_model/data/scenarios/detrended_wrt_decade/sce_"
+)
 
 # Number of times we cycle through the optimization for each component
 # to try to avoid potential local minima:
@@ -206,8 +209,13 @@ for ind, model in enumerate(model_list):
             raise ValueError("Experiment not recognised")
 
         # {"type": "butterworth", "pars": [1] means no smoothing
+        if model == "CNRM-ESM2-1" or model == "IPSL-CM6A-LR":
+            prefix_to_use = PREFIX_DETRENDED
+        else:
+            prefix_to_use = PREFIX
+
         expriment_data = load_and_prepare_esm_data(
-            PREFIX,
+            prefix_to_use,
             model,
             experiment,
             recalcEmis=True,
