@@ -258,7 +258,6 @@ class CarbonCycle:
             delta_ocn = self.ocean.update(
                 co2_atm,
                 self.catm[i],
-                i,
                 dtocn_i[i + 1],
             )
 
@@ -288,12 +287,12 @@ class CarbonCycle:
         Results of the simulation are available as class attributes.
         """
 
+        if any(key not in new_input for key in ["emis", "dtocn", "dtglb"]):
+            raise ValueError("Incorrect new_input supplied. Missing required values.")
+
         new_emis = new_input.get("emis")
         new_dtocn = new_input.get("dtocn")
         new_dtglb = new_input.get("dtglb")
-
-        if not new_emis or not new_dtocn or not new_dtglb:
-            raise ValueError("Incorrect new_input supplied. Missing required values.")
 
         new_fcva = new_input.get("fcva", 0)
         new_fcsa = new_input.get("fcsa", 0)
@@ -331,14 +330,13 @@ class CarbonCycle:
         delta_ocn = self.ocean.update(
             co2_atm,
             self.catm[self.current_step],
-            self.current_step,
             new_dtocn,
         )
 
         self.catm[self.current_step + 1] = (
             self.catm[self.current_step] + (dt_ems - delta_ocn - del_lnd) / PPM2GT
         )
-        self.emis[self.current_step + 1] = dt_ems
+        self.emis[self.current_step + 1] = new_emis
 
         self.current_step += 1
 
@@ -351,7 +349,8 @@ class CarbonCycle:
         input:
             -model: name of the model being simulated, so it can be added to plot titles.
         """
-
+        # plt.plot(self.esm_data.dtglb, self.esm_data.dtocn)
+        # plt.show()
         # Set font and size of plots
         matplotlib.rcParams.update({"font.size": 10})
         plt.figure(1, figsize=(24 / 2.54, 9 / 2.54))
@@ -384,13 +383,14 @@ class CarbonCycle:
         # Compare the calculated atmospheric C02 concentration with the one from the ESM
         # dataset (To see how well the model is performing)
         ax = plt.subplot(1, 4, 2)
-        plt.plot(
-            self.time,
-            self.catm,
-            color="orange",
-            alpha=0.5,
-            label="ESM",
-        )
+        if all(field in self.esm_data.keys() for field in ["time", "catm"]):
+            plt.plot(
+                self.esm_data.time,
+                self.esm_data.catm,
+                color="orange",
+                alpha=0.5,
+                label="ESM",
+            )
         plt.plot(self.time, self.catm, color="dodgerblue", alpha=0.5, label="SCC")
         plt.title(model + ": catm")
         leg = ax.legend(
@@ -683,6 +683,15 @@ def main():
         with open(pars_file, "r", encoding="utf-8") as infile:
             scc_pars = json.load(infile)
 
+        scc_pars["cveg0"] = esm_data.cveg[0]
+        scc_pars["csoil0"] = esm_data.csoil[0]
+        scc_pars["catm0"] = esm_data.catm[0]
+        scc_pars["npp0"] = np.mean(esm_data.npp[0:ninit_scenario])
+        scc_pars["gpp0"] = np.mean(esm_data.gpp[0:ninit_scenario])
+        scc_pars["lit0"] = np.mean(esm_data.lit[0:ninit_scenario])
+        scc_pars["sres0"] = np.mean(esm_data.rh[0:ninit_scenario])
+        scc_pars["vres0"] = np.mean(esm_data.ra[0:ninit_scenario])
+
         # Measure the time it takes us to run the model
         tbeg = systime.time()
 
@@ -697,6 +706,12 @@ def main():
         print("Time to process:", tend - tbeg)
 
         cc_emulator.create_plots(model)
+
+        plt.plot(cc_emulator.esm_data.dtglb, label="GMST")
+        plt.plot(cc_emulator.esm_data.dtocn, label="SST")
+        plt.plot(0.869*cc_emulator.esm_data.dtglb + 0.035, label="emulated SST")
+        plt.legend()
+        plt.show()
 
 
 if __name__ == "__main__":

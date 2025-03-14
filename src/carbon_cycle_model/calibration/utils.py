@@ -62,7 +62,7 @@ class Normalizer:
 
 
 def load_and_prepare_esm_data(
-    path, model, experiment, recalc_emis, ninit, smoothing_alg
+    path, model, experiment, recalc_emis, ninit, smoothing_alg, realisation="default"
 ):
     """
     Load and prepare the ESM data for calibration.
@@ -79,11 +79,17 @@ def load_and_prepare_esm_data(
     - ninit: number of initial datapoints (years) to use in the derivation of the
              pre-industrial quantities.
     - smoothing_alg: smoothing algorithm to use when loading the ESM data.
+    - realisation: realisation of the ESM run. If supplied, the function will
+                   attempt to load a name file with that string at the end of the
+                   file name.
 
     return: dictionary with loaded ESM data, under the appropriate model and
             scenario entries.
     """
-    file_path = path + model + "_" + experiment + ".txt"
+    if realisation != "default":
+        file_path = path + model + "_" + experiment + "_" + realisation + ".txt"
+    else:
+        file_path = path + model + "_" + experiment + ".txt"
     print("Loading file: ", file_path)
 
     esm_input = load_esm_data(
@@ -141,7 +147,7 @@ def load_and_prepare_esm_data(
         "sres0": sres0_par,
         "litp0": lit0_par,
     }
-    return {model: {experiment: loaded_data}}
+    return {model: {realisation: {experiment: loaded_data}}}
 
 
 def get_vars_from_experiments(esm_data, model, x):
@@ -340,25 +346,30 @@ def calculate_cost_gen_func_cross_experiment(
             we are calibrating against. (GtC)
     - esm_flux: timeseries of the relevant carbon flux for the experiment we are
                 calibrating against. (GtC/year)
+    - realisation: realisation of the ESM run.
 
     return: total cost across experiments.
     """
     cutoff = 30
     par_t_l, par_t_e, par_c_l, par_c_half = normalizer.inv(param)
     cost = 0
-    for experiment in esm_data[model].keys():
-        cost += cost_gen_func(
-            esm_data[model][experiment][flux0],
-            par_t_l,
-            par_t_e,
-            par_c_l,
-            par_c_half,
-            esm_data[model][experiment]["dtglb"],
-            esm_data[model][experiment]["catm"],
-            esm_data[model][experiment][stock],
-            esm_data[model][experiment][esm_flux],
-            cutoff=cutoff,
-        )
+    for realisation in esm_data[model].keys():
+        for experiment in esm_data[model][realisation].keys():
+            # if "ssp" in experiment:
+            # else:
+            #     np.ones()
+            cost += cost_gen_func(
+                esm_data[model][realisation][experiment][flux0],
+                par_t_l,
+                par_t_e,
+                par_c_l,
+                par_c_half,
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
+                esm_data[model][realisation][experiment][stock],
+                esm_data[model][realisation][experiment][esm_flux],
+                cutoff=cutoff,
+            )
     return np.log(cost)
 
 
@@ -460,7 +471,7 @@ def cost_gen_func(
 # ============================
 
 
-def calculate_cost_ocean_cross_experiment(param, normalizer, esm_data, model, dtime0):
+def calculate_cost_ocean_cross_experiment(param, normalizer, esm_data, model, dtime0, realisation="default"):
     """
     Calculate the "cost" of the ocean emulation for the associated parameters and flux
     across all experiments for a given model.
@@ -476,40 +487,43 @@ def calculate_cost_ocean_cross_experiment(param, normalizer, esm_data, model, dt
     - model: model to use for input to the cost calculation. Essentially, the model
              we are calibrating against.
     - dtime0: time step size for the ocean emulation. (year)
+    - realisation: realisation of the ESM run.
+
 
     return: total cost across experiments.
     """
     cutoff = 30
     docn, docnfac, ocntemp, docntemp = normalizer.inv(param)
     cost = 0
-    for experiment in esm_data[model].keys():
+    for experiment in esm_data[model][realisation].keys():
         num_steps = round(
             1
             + (
-                esm_data[model][experiment]["time"][-1]
-                - esm_data[model][experiment]["time"][0]
+                esm_data[model][realisation][experiment]["time"][-1]
+                - esm_data[model][realisation][experiment]["time"][0]
             )
             / dtime0
         )
         cost += cost_docn(
-            esm_data[model][experiment]["catm0"],
+            esm_data[model][realisation][experiment]["catm0"],
             dtime0,
             num_steps,
+            esm_data[model][realisation][experiment]["time"][0],
             docn,
             docnfac,
             ocntemp,
             docntemp,
-            esm_data[model][experiment]["time"],
-            esm_data[model][experiment]["catm"],
-            esm_data[model][experiment]["oflux"],
-            esm_data[model][experiment]["dtocn"],
+            esm_data[model][realisation][experiment]["time"],
+            esm_data[model][realisation][experiment]["catm"],
+            esm_data[model][realisation][experiment]["oflux"],
+            esm_data[model][realisation][experiment]["dtocn"],
             cutoff=cutoff,
         )
     return np.log(cost)
 
 
 def costdocn1(
-    param, normalizer, catm0, dtime0, num_steps, intime, catm, esm_oflux, dtocn
+    param, normalizer, catm0, dtime0, num_steps, t0, intime, catm, esm_oflux, dtocn
 ):
     """
     Calculate the "cost" of the ocean emulation for the associated parameters and flux
@@ -539,6 +553,7 @@ def costdocn1(
         catm0,
         dtime0,
         num_steps,
+        t0,
         docn,
         docnfac,
         ocntemp,
@@ -556,6 +571,7 @@ def cost_docn(
     catm0,
     dtime0,
     num_steps,
+    t0,
     docn,
     docnfac,
     ocntemp,
@@ -577,6 +593,7 @@ def cost_docn(
     - catm0: pre-industrial atmospheric carbon concentration.
     - dtime0: timestep size.
     - num_steps: number of time steps for the ocean emulation.
+    - t0: initial year.
     - docn: initial mixing depth for CO2 uptake. Calibrated parameter. (m)
     - docnfac: temperature dependence for change in mixing depth for CO2 uptake.
                Calibrated parameter. (dimensionless).
@@ -596,6 +613,7 @@ def cost_docn(
         catm0,
         dtime0,
         num_steps,
+        t0,
         docn,
         docnfac,
         ocntemp,
@@ -605,14 +623,14 @@ def cost_docn(
         dtocn,
     )
     variance = hi_freq_variance(esm_oflux, cutoff=cutoff)
-    rss = np.sum((scc_oflux - esm_oflux) ** 2)
+    rss = np.sum( ((scc_oflux - esm_oflux) ** 2))
     n = float(esm_oflux.shape[0])
     ans = rss / (n * variance)
     return ans
 
 
 def docn_func(
-    catm0, dtime0, num_steps, docn, docnfac, ocntemp, docntemp, intime, catm, dtocn
+    catm0, dtime0, num_steps, t0, docn, docnfac, ocntemp, docntemp, intime, catm, dtocn
 ):
     """
     Use the ocean scheme (Joos et al. 1996) to emulate the ocean carbon exchange with
@@ -622,6 +640,7 @@ def docn_func(
     - catm0: pre-industrial atmospheric carbon concentration.
     - dtime0: timestep size. (year)
     - num_steps: number of time steps for the ocean emulation.
+    - t0: initial year.
     - docn: initial mixing depth for CO2 uptake. Calibrated parameter. (m).
     - docnfac: temperature dependence for change in mixing depth for CO2 uptake.
                Calibrated parameter. (dimensionless)
@@ -639,7 +658,7 @@ def docn_func(
         "docntemp": docntemp,
         "catm0": catm0,
     }
-    oceancycle = OceanCarbonCycle(dtime0, num_steps, **pars)
+    oceancycle = OceanCarbonCycle(dtime0, dtime0, num_steps, t0, **pars)
 
     # Interpolate data to ocean model time points
     time_u = np.linspace(intime[0], intime[-1], num=num_steps, endpoint=True)
@@ -647,15 +666,13 @@ def docn_func(
     dtocn_u = np.interp(time_u, intime, dtocn)
 
     ntime = time_u.shape[0]
-    ocn_uptake = np.zeros(ntime, "f")
     n4occ = 1  # Ok since time_u is already made using dtime0
-    rjoos = joos_response(time_u)
     deltacocn = np.zeros(ntime, "f")
 
     # Run the ocean carbon emulation
     for i in range(1, ntime):
-        dco2_ocn, dummy = oceancycle.update(
-            catm_u[i], catm_u[i - 1], i - 1, ocn_uptake, rjoos, dtocn_u[i], n4occ
+        dco2_ocn = oceancycle.update(
+            catm_u[i], catm_u[i - 1], dtocn_u[i],
         )
         deltacocn[i] = dco2_ocn
 

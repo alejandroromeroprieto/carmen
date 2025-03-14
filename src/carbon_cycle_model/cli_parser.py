@@ -106,7 +106,7 @@ def cli_parser():
         # ],
     }
     scenario_opts = [
-        # "1pctco2",
+        "1pctco2",
         # "1pctco2-cdr",
         "ssp119",
         "ssp126",

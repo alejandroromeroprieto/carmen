@@ -18,11 +18,11 @@ from carbon_cycle_model.utils import load_esm_data
 from carbon_cycle_model.constants import SCEN_DIR
 
 
-DT_MODEL = 0.05
-DT_MODEL_OCEAN = 0.05
+DT_MODEL = 1/8
+DT_MODEL_OCEAN = 1/8
 
 MODEL_NAME = "UKESM1-0-LL"
-SCENARIO = "ssp585"
+SCENARIO = "ssp119"
 
 NUM_STEPS = int(1 / DT_MODEL)
 
@@ -34,9 +34,9 @@ if 1 % DT_MODEL != 0:
 
 cc_emulator = CarbonCycle(
     # if you wanna use ESM scenario data
-    {"model": "UKESM1-0-LL", "scenario": SCENARIO},
+    # {"model": "UKESM1-0-LL", "scenario": SCENARIO},
     # if you want to run without any pre-loaded scenario
-    # {"model": "UKESM1-0-LL", "initial_year": 1850, "final_year": 2100},
+    {"model": "UKESM1-0-LL", "initial_year": 1850, "final_year": 2100},
     DT_MODEL,
     DT_MODEL_OCEAN,
     npp_flag=True,
@@ -74,7 +74,7 @@ esm_data = load_esm_data(
 for i in range(len(esm_data.time)):  # Assuming esm data is yearly
     for j in range(NUM_STEPS):
         new_input = {
-            "emis": esm_data.gcmemis[i],
+            "emis": esm_data.gcmemis[i],  # you are supplying the rate here
             "dtocn": esm_data.dtocn[i],
             "dtglb": esm_data.dtglb[i],
         }
@@ -85,8 +85,9 @@ for i in range(len(esm_data.time)):  # Assuming esm data is yearly
             new_input.update({"fcsa": esm_data.fcsoilout[i]})
         if isinstance(esm_data.fcvegoutcsoilin, np.ndarray):
             new_input.update({"fcvs": esm_data.fcvegoutcsoilin[i]})
-
+        print(new_input)
         cc_emulator.run_one_step(new_input)
+
 
 cc_emulator.interpolate_results(esm_data.time)
 cc_emulator.create_plots(MODEL_NAME)

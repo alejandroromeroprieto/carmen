@@ -140,9 +140,7 @@ def use_linear_trend_to_extend_ends_1d(y, padlen):
             f"than half length of y which is {y.shape[0] / 2.0}"
         )
     y1 = predict_linear_fit(y[0:padlen], np.linspace(-padlen, -1, padlen))
-    y2 = predict_linear_fit(
-        y[-padlen:], np.linspace(padlen, 2 * padlen - 1, padlen)
-    )
+    y2 = predict_linear_fit(y[-padlen:], np.linspace(padlen, 2 * padlen - 1, padlen))
     return np.concatenate((y1, y, y2))
 
 
@@ -437,3 +435,12 @@ def make_all_dirs(fullfilename):
             print("making dir: ", subdir)
             os.makedirs(subdir)
     return 0
+
+
+def list_files_containing(folder_path, search_string):
+    """Returns a list of file names in the given folder that contain the search string."""
+    return [
+        f
+        for f in os.listdir(folder_path)
+        if os.path.isfile(os.path.join(folder_path, f)) and search_string in f
+    ]
