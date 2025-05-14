@@ -1,3 +1,6 @@
+# NOTE: THIS IS JUST SOME MESSY, AUXILIARY CODE THAT ALEX ROMERO PRIETO WROTE TO CREATE SOME PLOTS TO COMPARE PARAMETER VALUES
+# FROM DIFFERENT REALISATIONS FOR THE SAME MODEL (UKESM1-0-LL).
+# IT IS NOT CONSIDERED PART OF THE MODEL, AND PRESENTED "AS IS" IN CASE IT IS USEFUL IN THE FUTURE, AND FOR ARCHIVE PURPOSES.
 """
 Just testing with different realisations/
 """
@@ -14,8 +17,8 @@ from carbon_cycle_model.constants import SCEN_DIR, PARS_DIR
 
 realisations = ["default", "r2i1p1f2", "r3i1p1f2", "r4i1p1f2", "r8i1p1f2"]
 
-DT_MODEL = 1/8
-DT_MODEL_OCEAN = 1/8
+DT_MODEL = 1 / 8
+DT_MODEL_OCEAN = 1 / 8
 
 MODEL_NAME = "UKESM1-0-LL"
 SCENARIO = "ssp370"
@@ -41,10 +44,17 @@ esm_data_dict = {}
 for realisation in realisations:
 
     if realisation == "default":
-        data_file = Path(__file__).parent / scen_to_use / f"sce_{MODEL_NAME}_{SCENARIO}.txt"
+        data_file = (
+            Path(__file__).parent / scen_to_use / f"sce_{MODEL_NAME}_{SCENARIO}.txt"
+        )
         print("\nLoading ESM data from: ", data_file)
     else:
-        data_file = Path(__file__).parent / scen_to_use / "other_realisations" / f"sce_{MODEL_NAME}_{SCENARIO}_{realisation}.txt"
+        data_file = (
+            Path(__file__).parent
+            / scen_to_use
+            / "other_realisations"
+            / f"sce_{MODEL_NAME}_{SCENARIO}_{realisation}.txt"
+        )
         print("\nLoading ESM data from: ", data_file)
 
     esm_data = load_esm_data(
@@ -105,7 +115,9 @@ for realisation in realisations:
     for i in range(len(esm_data_dict[realisation].time)):  # Assuming esm data is yearly
         for j in range(NUM_STEPS):
             new_input = {
-                "emis": esm_data_dict[realisation].gcmemis[i],  # you are supplying the rate here
+                "emis": esm_data_dict[realisation].gcmemis[
+                    i
+                ],  # you are supplying the rate here
                 "dtocn": esm_data_dict[realisation].dtocn[i],
                 "dtglb": esm_data_dict[realisation].dtglb[i],
             }
@@ -115,7 +127,9 @@ for realisation in realisations:
             if isinstance(esm_data_dict[realisation].fcsoilout, np.ndarray):
                 new_input.update({"fcsa": esm_data_dict[realisation].fcsoilout[i]})
             if isinstance(esm_data_dict[realisation].fcvegoutcsoilin, np.ndarray):
-                new_input.update({"fcvs": esm_data_dict[realisation].fcvegoutcsoilin[i]})
+                new_input.update(
+                    {"fcvs": esm_data_dict[realisation].fcvegoutcsoilin[i]}
+                )
             cc_dict[realisation].run_one_step(new_input)
 
     cc_dict[realisation].interpolate_results(esm_data_dict[realisation].time)
@@ -128,29 +142,109 @@ for realisation in realisations:
 
 fig, axes = plt.subplots(nrows=2, ncols=4)
 for realisation in realisations:
-    axes[0, 0].scatter(esm_data_dict[realisation].time, esm_data_dict[realisation].catm, label=f"ESM ({realisation})", s=20, marker="x")
-    axes[0, 0].plot(esm_data_dict[realisation].time, cc_dict[realisation].catm, label=f"SCM ({realisation})")
+    axes[0, 0].scatter(
+        esm_data_dict[realisation].time,
+        esm_data_dict[realisation].catm,
+        label=f"ESM ({realisation})",
+        s=20,
+        marker="x",
+    )
+    axes[0, 0].plot(
+        esm_data_dict[realisation].time,
+        cc_dict[realisation].catm,
+        label=f"SCM ({realisation})",
+    )
 
-    axes[0, 1].scatter(esm_data_dict[realisation].time, esm_data_dict[realisation].cveg, label=f"ESM ({realisation})", s=20, marker="x")
-    axes[0, 1].plot(esm_data_dict[realisation].time, cc_dict[realisation].land.cveg, label=f"SCM ({realisation})")
+    axes[0, 1].scatter(
+        esm_data_dict[realisation].time,
+        esm_data_dict[realisation].cveg,
+        label=f"ESM ({realisation})",
+        s=20,
+        marker="x",
+    )
+    axes[0, 1].plot(
+        esm_data_dict[realisation].time,
+        cc_dict[realisation].land.cveg,
+        label=f"SCM ({realisation})",
+    )
 
-    axes[0, 2].scatter(esm_data_dict[realisation].time, esm_data_dict[realisation].csoil, label=f"ESM ({realisation})", s=20, marker="x")
-    axes[0, 2].plot(esm_data_dict[realisation].time, cc_dict[realisation].land.csoil, label=f"SCM ({realisation})")
+    axes[0, 2].scatter(
+        esm_data_dict[realisation].time,
+        esm_data_dict[realisation].csoil,
+        label=f"ESM ({realisation})",
+        s=20,
+        marker="x",
+    )
+    axes[0, 2].plot(
+        esm_data_dict[realisation].time,
+        cc_dict[realisation].land.csoil,
+        label=f"SCM ({realisation})",
+    )
 
-    axes[0, 3].scatter(esm_data_dict[realisation].time, np.cumsum(esm_data_dict[realisation].oflux), label=f"ESM ({realisation})", s=20, marker="x")
-    axes[0, 3].plot(esm_data_dict[realisation].time, cc_dict[realisation].ocean.carbon_increase, label=f"SCM ({realisation})")
+    axes[0, 3].scatter(
+        esm_data_dict[realisation].time,
+        np.cumsum(esm_data_dict[realisation].oflux),
+        label=f"ESM ({realisation})",
+        s=20,
+        marker="x",
+    )
+    axes[0, 3].plot(
+        esm_data_dict[realisation].time,
+        cc_dict[realisation].ocean.carbon_increase,
+        label=f"SCM ({realisation})",
+    )
 
-    axes[1, 0].scatter(esm_data_dict[realisation].time, esm_data_dict[realisation].npp, label=f"ESM ({realisation})", s=20, marker="x")
-    axes[1, 0].plot(esm_data_dict[realisation].time, cc_dict[realisation].land.npp, label=f"SCM ({realisation})")
+    axes[1, 0].scatter(
+        esm_data_dict[realisation].time,
+        esm_data_dict[realisation].npp,
+        label=f"ESM ({realisation})",
+        s=20,
+        marker="x",
+    )
+    axes[1, 0].plot(
+        esm_data_dict[realisation].time,
+        cc_dict[realisation].land.npp,
+        label=f"SCM ({realisation})",
+    )
 
-    axes[1, 1].scatter(esm_data_dict[realisation].time, esm_data_dict[realisation].oflux, label=f"ESM ({realisation})", s=20, marker="x")
-    axes[1, 1].plot(esm_data_dict[realisation].time, cc_dict[realisation].ocean.oflux, label=f"SCM ({realisation})")
+    axes[1, 1].scatter(
+        esm_data_dict[realisation].time,
+        esm_data_dict[realisation].oflux,
+        label=f"ESM ({realisation})",
+        s=20,
+        marker="x",
+    )
+    axes[1, 1].plot(
+        esm_data_dict[realisation].time,
+        cc_dict[realisation].ocean.oflux,
+        label=f"SCM ({realisation})",
+    )
 
-    axes[1, 2].scatter(esm_data_dict[realisation].time, esm_data_dict[realisation].lit, label=f"ESM ({realisation})", s=20, marker="x")
-    axes[1, 2].plot(esm_data_dict[realisation].time, cc_dict[realisation].land.lit, label=f"SCM ({realisation})")
+    axes[1, 2].scatter(
+        esm_data_dict[realisation].time,
+        esm_data_dict[realisation].lit,
+        label=f"ESM ({realisation})",
+        s=20,
+        marker="x",
+    )
+    axes[1, 2].plot(
+        esm_data_dict[realisation].time,
+        cc_dict[realisation].land.lit,
+        label=f"SCM ({realisation})",
+    )
 
-    axes[1, 3].scatter(esm_data_dict[realisation].time, esm_data_dict[realisation].rh, label=f"ESM ({realisation})", s=20, marker="x")
-    axes[1, 3].plot(esm_data_dict[realisation].time, cc_dict[realisation].land.sres, label=f"SCM ({realisation})")
+    axes[1, 3].scatter(
+        esm_data_dict[realisation].time,
+        esm_data_dict[realisation].rh,
+        label=f"ESM ({realisation})",
+        s=20,
+        marker="x",
+    )
+    axes[1, 3].plot(
+        esm_data_dict[realisation].time,
+        cc_dict[realisation].land.sres,
+        label=f"SCM ({realisation})",
+    )
 
 plt.legend()
 plt.show()

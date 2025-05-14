@@ -1,3 +1,6 @@
+# NOTE: THIS IS JUST SOME MESSY, AUXILIARY CODE THAT ALEX ROMERO PRIETO WROTE TO CREATE SOME PLOTS TO COMPARE PARAMETER VALUES
+# IT IS NOT CONSIDERED PART OF THE MODEL, AND PRESENTED "AS IS" IN CASE IT IS USEFUL IN THE FUTURE, AND FOR ARCHIVE PURPOSES.
+
 # import json
 # import pandas as pd
 # import matplotlib.pyplot as plt
@@ -50,10 +53,10 @@
 
 # # Display the average row separately
 # df_avg_display = df_with_avg.loc[["Average"]].T  # Transpose for table format
-# plt.table(cellText=df_avg_display.values, 
-#           rowLabels=df_avg_display.index, 
-#           colLabels=df_avg_display.columns, 
-#           cellLoc="center", 
+# plt.table(cellText=df_avg_display.values,
+#           rowLabels=df_avg_display.index,
+#           colLabels=df_avg_display.columns,
+#           cellLoc="center",
 #           loc="bottom")
 
 # plt.subplots_adjust(left=0.2, bottom=0.3)  # Adjust layout to fit the table
@@ -109,7 +112,7 @@ df["model_realisation"] = df["model"] + " - " + df["realisation"]
 df = df.set_index(["model", "realisation"])
 
 # Select only numeric columns
-numeric_cols = df.select_dtypes(include=['number'])
+numeric_cols = df.select_dtypes(include=["number"])
 
 # Compute Mean and Std Dev as separate rows
 mean_row = numeric_cols.mean().rename("Mean")
@@ -141,7 +144,13 @@ marker_size = 200
 fig, ax1 = plt.subplots(figsize=(14, 6))
 
 # Boxplot for low-magnitude variables
-sns.boxplot(data=df_numeric[magnitude_vars][0:len(file_paths)-1], ax=ax1, color="lightblue", width=1, linewidth=1)
+sns.boxplot(
+    data=df_numeric[magnitude_vars][0 : len(file_paths) - 1],
+    ax=ax1,
+    color="lightblue",
+    width=1,
+    linewidth=1,
+)
 ax1.set_ylabel("t_l", color="blue")
 ax1.tick_params(axis="y", labelcolor="blue")
 
@@ -150,21 +159,90 @@ ax1.tick_params(axis="y", labelcolor="blue")
 # means_high = df_numeric[high_magnitude_vars].mean()
 
 # Add means with correct x positions
-ax1.scatter(range(len(magnitude_vars)), df_numeric[magnitude_vars].loc["Mean"], color="red", label="Mean", zorder=3, marker="x", s=marker_size)
+ax1.scatter(
+    range(len(magnitude_vars)),
+    df_numeric[magnitude_vars].loc["Mean"],
+    color="red",
+    label="Mean",
+    zorder=3,
+    marker="x",
+    s=marker_size,
+)
 
 # Add all realisations calibration with correct x positions
-ax1.scatter(range(len(magnitude_vars)), df_numeric[magnitude_vars].iloc[5], color="purple", label="All realisation calibration", zorder=3, marker="x", s=marker_size)
+ax1.scatter(
+    range(len(magnitude_vars)),
+    df_numeric[magnitude_vars].iloc[5],
+    color="purple",
+    label="All realisation calibration",
+    zorder=3,
+    marker="x",
+    s=marker_size,
+)
 
 # Add other models
-ax1.scatter(range(len(magnitude_vars)), df_others[magnitude_vars].iloc[0], color="olive", label="NorESM2-LM", zorder=3, s=marker_size)
-ax1.scatter(range(len(magnitude_vars)), df_others[magnitude_vars].iloc[1], color="cyan", label="IPSL-CM6A-LR", zorder=3, s=marker_size)
-ax1.scatter(range(len(magnitude_vars)), df_others[magnitude_vars].iloc[2], color="brown", label="CanESM5", zorder=3, s=marker_size)
+ax1.scatter(
+    range(len(magnitude_vars)),
+    df_others[magnitude_vars].iloc[0],
+    color="olive",
+    label="NorESM2-LM",
+    zorder=3,
+    s=marker_size,
+)
+ax1.scatter(
+    range(len(magnitude_vars)),
+    df_others[magnitude_vars].iloc[1],
+    color="cyan",
+    label="IPSL-CM6A-LR",
+    zorder=3,
+    s=marker_size,
+)
+ax1.scatter(
+    range(len(magnitude_vars)),
+    df_others[magnitude_vars].iloc[2],
+    color="brown",
+    label="CanESM5",
+    zorder=3,
+    s=marker_size,
+)
 
 # Add emissions scenarios calibration
-ax1.scatter(range(len(magnitude_vars)), df_others[magnitude_vars].iloc[3], color="gold", label="UKESM-emissions", zorder=3, marker="*", s=marker_size)
-ax1.scatter(range(len(magnitude_vars)), df_others[magnitude_vars].iloc[4], color="red", label="UKESM-ssp534-ssp585", zorder=3, marker="*", s=marker_size)
-ax1.scatter(range(len(magnitude_vars)), df_others[magnitude_vars].iloc[5], color="red", label="UKESM-1pctco2", zorder=3, marker="+", s=marker_size)
-ax1.scatter(range(len(magnitude_vars)), df_others[magnitude_vars].iloc[6], color="red", label="UKESM-1pctco2-hist-noLU", zorder=3, marker="<", s=marker_size)
+ax1.scatter(
+    range(len(magnitude_vars)),
+    df_others[magnitude_vars].iloc[3],
+    color="gold",
+    label="UKESM-emissions",
+    zorder=3,
+    marker="*",
+    s=marker_size,
+)
+ax1.scatter(
+    range(len(magnitude_vars)),
+    df_others[magnitude_vars].iloc[4],
+    color="red",
+    label="UKESM-ssp534-ssp585",
+    zorder=3,
+    marker="*",
+    s=marker_size,
+)
+ax1.scatter(
+    range(len(magnitude_vars)),
+    df_others[magnitude_vars].iloc[5],
+    color="red",
+    label="UKESM-1pctco2",
+    zorder=3,
+    marker="+",
+    s=marker_size,
+)
+ax1.scatter(
+    range(len(magnitude_vars)),
+    df_others[magnitude_vars].iloc[6],
+    color="red",
+    label="UKESM-1pctco2-hist-noLU",
+    zorder=3,
+    marker="<",
+    s=marker_size,
+)
 
 # # Second y-axis for high-magnitude variables
 # ax2 = ax1.twinx()
