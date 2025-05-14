@@ -100,15 +100,15 @@ class LandCarbonCycle:
 
         # Calculate new carbon stocks using an implicit euler scheme
         if npp_flag:
-            # cveg*(1.0-dt*lit) + dt*(npp-fcva - fcvs)
+            # cveg*(1.0+dt*(npp-lit) - dt*(fcva + fcvs)
             cvegnew = self.cveg[self.timestep_ind] * (
-                1.0 - self.dt * (lit)
-            ) + self.dt * (npp - fcva - fcvs)
+                1.0 + self.dt * (npp - lit)
+            ) - self.dt * (fcva + fcvs)
         else:
-            # cveg*(1.0-dt*(lit + vres)) + dt*(gpp-fcva - fcvs)
+            # cveg*(1.0+dt*(gpp - lit - vres)) - dt*(fcva + fcvs)
             cvegnew = self.cveg[self.timestep_ind] * (
-                1.0 - self.dt * (lit + vres)
-            ) + self.dt * (gpp - fcva - fcvs)
+                1.0 + self.dt * (gpp - lit - vres)
+            ) - self.dt * (fcva + fcvs)
 
         # csoil*(1.0-dt*sres) + gamma*dt*cveg + dt*(fcvs-fcsa)
         csoilnew = (
@@ -123,11 +123,13 @@ class LandCarbonCycle:
         self.lit[self.timestep_ind + 1] = lit * cvegnew
         self.sres[self.timestep_ind + 1] = sres * csoilnew
         if npp_flag:
-            self.npp[self.timestep_ind + 1] = npp
+            self.npp[self.timestep_ind + 1] = npp * cvegnew
         else:
-            self.gpp[self.timestep_ind + 1] = gpp
+            self.gpp[self.timestep_ind + 1] = gpp * cvegnew
             self.vres[self.timestep_ind + 1] = vres * cvegnew
-            self.npp[self.timestep_ind + 1] = gpp - self.vres[self.timestep_ind + 1]
+            self.npp[self.timestep_ind + 1] = (
+                gpp - self.vres[self.timestep_ind + 1]
+            ) * cvegnew
 
         self.fcva[self.timestep_ind + 1] = fcva
         self.fcsa[self.timestep_ind + 1] = fcsa

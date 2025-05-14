@@ -3,7 +3,7 @@ List of physical and model constants.
 """
 
 # Paths
-PARS_DIR = "data/pars"
+PARS_DIR = "data/pars/logistic_ocean_model"
 SCEN_DIR = "data/scenarios"
 
 GAS_EXCHANGE_COEF = 0.1306  # for the carbon exchange between atmosphere and OML

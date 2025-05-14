@@ -86,7 +86,7 @@ class CarbonCycle:
                     ninit=ninit_scenario,
                     smoothing_pars={"type": "savgol", "pars": [21, 3]},
                 )
-            
+
                 initial_year = esm_data.time[0]
                 final_year = esm_data.time[-1]
 
@@ -258,11 +258,11 @@ class CarbonCycle:
             delta_ocn = self.ocean.update(
                 co2_atm,
                 self.catm[i],
-                i,
                 dtocn_i[i + 1],
             )
 
             self.catm[i + 1] = self.catm[i] + (dt_ems - delta_ocn - del_lnd) / PPM2GT
+            self.emis[i + 1] = emis_i[i]
 
             self.current_step += 1
 
@@ -288,12 +288,15 @@ class CarbonCycle:
         Results of the simulation are available as class attributes.
         """
 
+        if any(key not in new_input for key in ["emis", "dtocn", "dtglb"]):
+            raise ValueError(
+                "Incorrect new_input supplied. Missing at least one of the required "
+                "key values: 'emis', 'dtocn' and 'dtglb'."
+            )
+
         new_emis = new_input.get("emis")
         new_dtocn = new_input.get("dtocn")
         new_dtglb = new_input.get("dtglb")
-
-        if not new_emis or not new_dtocn or not new_dtglb:
-            raise ValueError("Incorrect new_input supplied. Missing required values.")
 
         new_fcva = new_input.get("fcva", 0)
         new_fcsa = new_input.get("fcsa", 0)
@@ -331,14 +334,13 @@ class CarbonCycle:
         delta_ocn = self.ocean.update(
             co2_atm,
             self.catm[self.current_step],
-            self.current_step,
             new_dtocn,
         )
 
         self.catm[self.current_step + 1] = (
             self.catm[self.current_step] + (dt_ems - delta_ocn - del_lnd) / PPM2GT
         )
-        self.emis[self.current_step + 1] = dt_ems
+        self.emis[self.current_step + 1] = new_emis
 
         self.current_step += 1
 
@@ -384,13 +386,14 @@ class CarbonCycle:
         # Compare the calculated atmospheric C02 concentration with the one from the ESM
         # dataset (To see how well the model is performing)
         ax = plt.subplot(1, 4, 2)
-        plt.plot(
-            self.time,
-            self.catm,
-            color="orange",
-            alpha=0.5,
-            label="ESM",
-        )
+        if all(field in self.esm_data.keys() for field in ["time", "catm"]):
+            plt.plot(
+                self.esm_data.time,
+                self.esm_data.catm,
+                color="orange",
+                alpha=0.5,
+                label="ESM",
+            )
         plt.plot(self.time, self.catm, color="dodgerblue", alpha=0.5, label="SCC")
         plt.title(model + ": catm")
         leg = ax.legend(
@@ -632,7 +635,8 @@ def main():
     """
 
     # Smoothing to perform on input ESM data
-    smoothing_algorithm = {"type": "savgol", "pars": [21, 3]}
+    # smoothing_algorithm = {"type": "butterworth", "pars": [21, 3]}
+    smoothing_algorithm = {"type": "butterworth", "pars": [1]}  # No smoothing
 
     # Numerical instability can arise if dtoccmax is too large. We recommend to keep it
     # to 0.2 or less.
@@ -643,7 +647,7 @@ def main():
     recalc_emis = True
 
     # Run the cli parser and retrieve the required information
-    models, scenario, scenario_pars, _, npp_flag = cli_parser()
+    models, scenario, scenario_pars, realisation, _, npp_flag = cli_parser()
 
     # Run emulation for each model
     for model in models:
@@ -652,6 +656,8 @@ def main():
         # 1pctco2(-cdr) just take the first value, as subsequent values will
         # already have significantly diverged from equilibrium.
         if scenario in ["1pctco2", "1pctco2-cdr"]:
+            ninit_scenario = 1
+        elif "abrupt" in scenario:
             ninit_scenario = 1
         else:
             ninit_scenario = 20
@@ -664,7 +670,18 @@ def main():
             scen_to_use = SCEN_DIR
             pars_to_use = PARS_DIR
 
-        data_file = Path(__file__).parent / scen_to_use / f"sce_{model}_{scenario}.txt"
+        if realisation != "default":
+            scen_to_use = SCEN_DIR + "/other_realisations"
+            data_file = (
+                Path(__file__).parent
+                / scen_to_use
+                / f"sce_{model}_{scenario}_{realisation}.txt"
+            )
+        else:
+            data_file = (
+                Path(__file__).parent / scen_to_use / f"sce_{model}_{scenario}.txt"
+            )
+
         print("\nLoading ESM data from: ", data_file)
 
         esm_data = load_esm_data(
@@ -682,6 +699,21 @@ def main():
 
         with open(pars_file, "r", encoding="utf-8") as infile:
             scc_pars = json.load(infile)
+
+        # Record pre-industrial values. Fluxes are an averaged over the
+        # 0:ninit_scenario period (which depends on the scenario) and stocks
+        # are simply the first value in the array. We do not take the average
+        # for stocks because that would lead to larger discrepancies with the
+        # ESM data we are trying to emulate, as they would start from a different
+        # point.
+        scc_pars["cveg0"] = esm_data.cveg[0]
+        scc_pars["csoil0"] = esm_data.csoil[0]
+        scc_pars["catm0"] = esm_data.catm[0]
+        scc_pars["npp0"] = np.mean(esm_data.npp[0:ninit_scenario])
+        scc_pars["gpp0"] = np.mean(esm_data.gpp[0:ninit_scenario])
+        scc_pars["lit0"] = np.mean(esm_data.lit[0:ninit_scenario])
+        scc_pars["sres0"] = np.mean(esm_data.rh[0:ninit_scenario])
+        scc_pars["vres0"] = np.mean(esm_data.ra[0:ninit_scenario])
 
         # Measure the time it takes us to run the model
         tbeg = systime.time()

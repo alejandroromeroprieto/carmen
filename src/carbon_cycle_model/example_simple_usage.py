@@ -18,11 +18,11 @@ from carbon_cycle_model.utils import load_esm_data
 from carbon_cycle_model.constants import SCEN_DIR
 
 
-DT_MODEL = 0.05
-DT_MODEL_OCEAN = 0.05
+DT_MODEL = 1/8
+DT_MODEL_OCEAN = 1/8
 
 MODEL_NAME = "UKESM1-0-LL"
-SCENARIO = "ssp585"
+SCENARIO = "ssp119"
 
 NUM_STEPS = int(1 / DT_MODEL)
 
@@ -33,7 +33,7 @@ if 1 % DT_MODEL != 0:
     )
 
 cc_emulator = CarbonCycle(
-    # if you wanna use ESM scenario data
+    # if you want to use ESM scenario data
     {"model": "UKESM1-0-LL", "scenario": SCENARIO},
     # if you want to run without any pre-loaded scenario
     # {"model": "UKESM1-0-LL", "initial_year": 1850, "final_year": 2100},
@@ -74,6 +74,8 @@ esm_data = load_esm_data(
 for i in range(len(esm_data.time)):  # Assuming esm data is yearly
     for j in range(NUM_STEPS):
         new_input = {
+            # emis is technically the rate of yearly emissions, so if the step was
+            # smaller than a year it would need to be converted into year-equivalent
             "emis": esm_data.gcmemis[i],
             "dtocn": esm_data.dtocn[i],
             "dtglb": esm_data.dtglb[i],
