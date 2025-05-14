@@ -142,11 +142,9 @@ class OceanCarbonCycle:
 
         mol_units_converter = 1.722e17
 
-        # TODO: explore sensibility to the choice of parameterisation here. (OSCAR has
-        # TODO: d_0*par*e^(par*T))  (Eq__D_mld in link below) but this explores for T>>1
-        # TODO: https://github.com/tgasser/OSCAR/blob/master/core_fct/mod_process.py
-        # Modulation of the mixed layer depth. We follow OSCAR here, and use an
-        # exponential dependence on sea surface temperature.
+        # TODO: this is here for the archive, but delete for clean version of model
+        # Modulation of the mixed layer depth.
+        # I tested many different functional dependence here for this modulation:
         # docntemp = self.docn * (
         #     1.0
         #     + np.maximum(
@@ -157,8 +155,23 @@ class OceanCarbonCycle:
         # docntemp = self.docn * np.maximum(0.5, np.minimum(2, (1 + self.docnfac * dt_ocn) * np.exp(self.docntemp * dt_ocn)))
         # docntemp = self.docn * np.maximum(0.5, np.minimum(2, self.docnfac * np.exp(self.docntemp * dt_ocn)))
         # docntemp = self.docn * np.maximum(0.5, np.minimum(2, self.docnfac * np.exp(self.docntemp * dt_ocn)))
-        # docntemp = self.docn * (self.docnfac/(1+np.exp(self.docntemp * dt_ocn)) + 0.5) # 4.664868421746609
-        docntemp = self.docn * (1/(1+np.exp(self.docntemp * dt_ocn)) + 0.5)  #  4.678074064298765
+        # docntemp = self.docn * (self.docnfac/(1+np.exp(self.docntemp * dt_ocn)) + 0.5)
+        # temp = self.docnfac * (np.exp(self.docntemp * dt_ocn) - 1)
+        # docntemp = self.docn * (
+        #     1 - temp/(1+temp)
+        # )  #  4.678074064298765
+        # docntemp = 20 + (self.docn - 20)*np.exp(self.docntemp*dt_ocn)
+        # docntemp = self.docn * (np.exp()/(1 + 2))
+
+        # In practice the choice did not seem to have a big impact on the results, so a logistic
+        # appraoch was taken to moderate the behaviour of the modulate at big/small temperature
+        # anomalies.
+        # For context: OSCAR does the following:
+        # d_0*par*e^(par*T))  (Eq__D_mld in link below) but this explodes for large Ts
+        # https://github.com/tgasser/OSCAR/blob/master/core_fct/mod_process.py
+        docntemp = self.docn * (
+            1 / (1 + np.exp(self.docntemp * dt_ocn)) + 0.5
+        )
 
         cmol = mol_units_converter / docntemp
 
@@ -170,7 +183,9 @@ class OceanCarbonCycle:
             total_uptake = 0  # Total uptake for this dtstep
             k = k0 + 1
             catmk = catm1 + grad_catm * dtstep * (k - 0.5)  # (k-0.5) midpoint of dtstep
-            istep = (self.timestep_ind) * self.n4occ + k  # istep is end of the occ prediction timestep
+            istep = (
+                self.timestep_ind
+            ) * self.n4occ + k  # istep is end of the occ prediction timestep
 
             # Warning, Python processing is much slower if one doesn't multiply cmol*
             # uptake INSIDE the loop below. Note that uptake here is typically very small:
@@ -188,6 +203,10 @@ class OceanCarbonCycle:
             # I guess that we take catm0 as in pre-industrial the partial pressures
             # would be the same
             # due to the equilibrium assumption.
+            # TODO: this is here for the archive, but delete for clean version of model
+            # The calibration result did not show high sensibility to the choice of function
+            # employed here to modify the ocean partial pressure. Consequently, we used a
+            # logisitc function again as a well-behaved function for large tempreatures.
             # cocn = (self.catm0 + psum) * np.exp(self.ocntemp * dt_ocn) # original
             cocn = (self.catm0 + psum) * (1 / (1 + np.exp(self.ocntemp * dt_ocn)) + 0.5)
             uptakenew = (GAS_EXCHANGE_COEF / OCEAN_AREA) * (catmk - cocn)
