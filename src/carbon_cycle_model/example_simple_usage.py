@@ -85,6 +85,7 @@ for i in range(len(esm_data.time)):  # Assuming esm data is yearly
             new_input.update({"fcsa": esm_data.fcsoilout[i]})
         if isinstance(esm_data.fcvegoutcsoilin, np.ndarray):
             new_input.update({"fcvs": esm_data.fcvegoutcsoilin[i]})
+
         cc_emulator.run_one_step(new_input)
 
 cc_emulator.interpolate_results(esm_data.time)
