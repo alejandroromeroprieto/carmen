@@ -26,26 +26,25 @@ of:
 """
 
 import json
+import os
+import numpy as np
 from pathlib import Path
 import time as systime
-import os
-
-import numpy as np
 
 from carbon_cycle_model.calibration.utils import (
     Normalizer,
+    calculate_cost_gen_func,
+    calculate_cost_gen_func_cross_experiment,
+    calculate_cost_ocean_cross_experiment,
+    costdocn1,
+    docn_func,
     load_and_prepare_esm_data,
     run_minimisation,
-    calculate_cost_gen_func_cross_experiment,
-    calculate_cost_gen_func,
-    prepare_contour_data,
     plot_diagnostic,
-    calculate_cost_ocean_cross_experiment,
-    docn_func,
-    costdocn1,
+    prepare_contour_data,
 )
-from carbon_cycle_model.utils import Data, make_all_dirs
 from carbon_cycle_model.land_component.boxes.utils import general_calibration_fun
+from carbon_cycle_model.utils import Data, make_all_dirs
 
 # Order for optimizations:
 #   1. GPP
@@ -1394,7 +1393,7 @@ for ind, model in enumerate(model_list):
         plot_diagnostic(
             OUT_DIR,
             esm_data[model][realisation][experiment],
-            fit[i::len(experiment_list)],
+            fit[i :: len(experiment_list)],
             outplot=outplot,
             fontsize=10,
             xsize=16.0,
