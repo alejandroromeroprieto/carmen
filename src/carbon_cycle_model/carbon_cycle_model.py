@@ -224,9 +224,6 @@ class CarbonCycle:
         # Cumulative emissions, used to track carbon losses
         cems = np.zeros(self.num_steps)
 
-        cveg_i = np.interp(time_i, self.esm_data.time, self.esm_data.cveg)
-        csoil_i = np.interp(time_i, self.esm_data.time, self.esm_data.csoil)
-
         # Run the components forward
         for i in range(0, self.num_steps - 1):
             timestep = time_i[i + 1] - time_i[i]
@@ -245,8 +242,6 @@ class CarbonCycle:
                 fcva=fcva_i[i],
                 fcsa=fcsa_i[i],
                 fcvs=fcvs_i[i],
-                cveg_esm=cveg_i[i],
-                csoil_esm=csoil_i[i],
             )
             del_lnd = delta_cveg + delta_csoil
 
@@ -267,7 +262,7 @@ class CarbonCycle:
             )
 
             self.catm[i + 1] = self.catm[i] + (dt_ems - delta_ocn - del_lnd) / PPM2GT
-            self.emis[i+1] = emis_i[i]
+            self.emis[i + 1] = emis_i[i]
 
             self.current_step += 1
 
@@ -294,7 +289,10 @@ class CarbonCycle:
         """
 
         if any(key not in new_input for key in ["emis", "dtocn", "dtglb"]):
-            raise ValueError("Incorrect new_input supplied. Missing required values.")
+            raise ValueError(
+                "Incorrect new_input supplied. Missing at least one of the required "
+                "key values: 'emis', 'dtocn' and 'dtglb'."
+            )
 
         new_emis = new_input.get("emis")
         new_dtocn = new_input.get("dtocn")
@@ -355,8 +353,7 @@ class CarbonCycle:
         input:
             -model: name of the model being simulated, so it can be added to plot titles.
         """
-        # plt.plot(self.esm_data.dtglb, self.esm_data.dtocn)
-        # plt.show()
+
         # Set font and size of plots
         matplotlib.rcParams.update({"font.size": 10})
         plt.figure(1, figsize=(24 / 2.54, 9 / 2.54))
@@ -639,7 +636,7 @@ def main():
 
     # Smoothing to perform on input ESM data
     # smoothing_algorithm = {"type": "butterworth", "pars": [21, 3]}
-    smoothing_algorithm = {"type": "butterworth", "pars": [1]}
+    smoothing_algorithm = {"type": "butterworth", "pars": [1]}  # No smoothing
 
     # Numerical instability can arise if dtoccmax is too large. We recommend to keep it
     # to 0.2 or less.
@@ -675,9 +672,15 @@ def main():
 
         if realisation != "default":
             scen_to_use = SCEN_DIR + "/other_realisations"
-            data_file = Path(__file__).parent / scen_to_use / f"sce_{model}_{scenario}_{realisation}.txt"
+            data_file = (
+                Path(__file__).parent
+                / scen_to_use
+                / f"sce_{model}_{scenario}_{realisation}.txt"
+            )
         else:
-            data_file = Path(__file__).parent / scen_to_use / f"sce_{model}_{scenario}.txt"
+            data_file = (
+                Path(__file__).parent / scen_to_use / f"sce_{model}_{scenario}.txt"
+            )
 
         print("\nLoading ESM data from: ", data_file)
 
@@ -697,6 +700,12 @@ def main():
         with open(pars_file, "r", encoding="utf-8") as infile:
             scc_pars = json.load(infile)
 
+        # Record pre-industrial values. Fluxes are an averaged over the
+        # 0:ninit_scenario period (which depends on the scenario) and stocks
+        # are simply the first value in the array. We do not take the average
+        # for stocks because that would lead to larger discrepancies with the
+        # ESM data we are trying to emulate, as they would start from a different
+        # point.
         scc_pars["cveg0"] = esm_data.cveg[0]
         scc_pars["csoil0"] = esm_data.csoil[0]
         scc_pars["catm0"] = esm_data.catm[0]
@@ -720,12 +729,6 @@ def main():
         print("Time to process:", tend - tbeg)
 
         cc_emulator.create_plots(model)
-
-        # plt.plot(cc_emulator.esm_data.dtglb, label="GMST")
-        # plt.plot(cc_emulator.esm_data.dtocn, label="SST")
-        # plt.plot(0.869*cc_emulator.esm_data.dtglb + 0.035, label="emulated SST")
-        # plt.legend()
-        # plt.show()
 
 
 if __name__ == "__main__":
