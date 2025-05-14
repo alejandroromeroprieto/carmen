@@ -15,7 +15,6 @@ from carbon_cycle_model.utils import load_esm_data
 from carbon_cycle_model.land_component.boxes.utils import general_calibration_fun
 from carbon_cycle_model.utils import butterworth
 from carbon_cycle_model.ocean_component.ocean_component import OceanCarbonCycle
-from carbon_cycle_model.ocean_component.utils import joos_response
 
 
 class Normalizer:
@@ -295,7 +294,7 @@ def run_minimisation(func, p0, inargs, xlo, xhi, ftol=1e-6, attempts=5):
                 ", costout=",
                 costout,
                 ", termination reason: ",
-                outmin.message
+                outmin.message,
             )
             print("  p_bar=", p_bar)
 
@@ -353,7 +352,6 @@ def calculate_cost_gen_func_cross_experiment(
             we are calibrating against. (GtC)
     - esm_flux: timeseries of the relevant carbon flux for the experiment we are
                 calibrating against. (GtC/year)
-    - realisation: realisation of the ESM run.
 
     return: total cost across experiments.
     """
@@ -362,11 +360,9 @@ def calculate_cost_gen_func_cross_experiment(
     cost = 0
     for realisation in esm_data[model].keys():
         for experiment in esm_data[model][realisation].keys():
-            # if "ssp" in experiment:
-            # else:
-            #     np.ones()
             cost += cost_gen_func(
-                esm_data[model][realisation][experiment][flux0]/esm_data[model][realisation][experiment][stock][0],
+                esm_data[model][realisation][experiment][flux0]
+                / esm_data[model][realisation][experiment][stock][0],
                 par_t_l,
                 par_t_e,
                 par_c_l,
@@ -408,7 +404,15 @@ def calculate_cost_gen_func(param, normalizer, flux0, catm, stock, dtglb, esm_fl
     # param are normalized (range [0,1]), so use inv method to 'de-normalize'
     par_t_l, par_t_e, par_c_l, par_c_half = normalizer.inv(param)
     ans1 = cost_gen_func(
-        flux0/stock[0], par_t_l, par_t_e, par_c_l, par_c_half, dtglb, catm, stock, esm_flux
+        flux0 / stock[0],
+        par_t_l,
+        par_t_e,
+        par_c_l,
+        par_c_half,
+        dtglb,
+        catm,
+        stock,
+        esm_flux,
     )
     return np.log(ans1)
 
@@ -426,22 +430,23 @@ def cost_gen_func(
     cutoff=30,
 ):
     """
-    Calculate the cost of the "gen_func" for the associated parameters and flux
-    across all experiments for a given model.
+    Calculate the cost of the "general_calibration_fun" for the associated parameters
+    and flux across all experiments for a given model.
 
-    This "cost" is essentially a measure of how close our approximation by the gen_func
-    is to the original esm flux timseries.
+    This "cost" is essentially a measure of how close our approximation by the
+    general_calibration_fun is to the original esm flux timseries.
 
     input:
-    - flux0: pre-industrial value for the carbon flux we are applying the "gen_func"
-             approximation to. (GtC/year)
-    - par_t_l: parameter associated with the linear dependence on temperature of gen_func
+    - flux0: pre-industrial value for the carbon flux we are applying the
+             "general_calibration_fun" approximation to. (GtC/year)
+    - par_t_l: parameter associated with the linear dependence on temperature of
+               general_calibration_fun
     - par_t_e: parameter associated with the exponential dependence on temperature of
-               gen_func
+               general_calibration_fun
     - par_c_l: parameter associated with the linear dependence on carbon stocks of
-               gen_func
+               general_calibration_fun
     - par_c_half: parameter associated with the atmospheric carbon saturation component
-                  of gen_func
+                  of general_calibration_fun
     - dtglb: timeseries of the temperature anomaly for the experiment we are calibrating
             against. (K)
     - catm: timeseries of the carbon concentration of the atmosphere for the experiment
@@ -466,7 +471,7 @@ def cost_gen_func(
         dtglb,
         catm,
     )
-    scc_val = scc_val*stock
+    scc_val = scc_val * stock
     variance = hi_freq_variance(esm_flux, cutoff=cutoff)
     cost = np.sum((scc_val - esm_flux) ** 2)
     n = float(esm_flux.shape[0])
@@ -479,7 +484,9 @@ def cost_gen_func(
 # ============================
 
 
-def calculate_cost_ocean_cross_experiment(param, normalizer, esm_data, model, dtime0, realisation="default"):
+def calculate_cost_ocean_cross_experiment(
+    param, normalizer, esm_data, model, dtime0, realisation="default"
+):
     """
     Calculate the "cost" of the ocean emulation for the associated parameters and flux
     across all experiments for a given model.
@@ -546,6 +553,7 @@ def costdocn1(
                   normalised and vice versa.
     - dtime0: timestep size. (year)
     - num_steps: number of time steps for the ocean emulation.
+    - t0: initial year.
     - intime: array with ESM time.
     - catm: array with atmospheric carbon concentrations. (ppm)
     - esm_flux: array with atmosphere-ocean carbon exchange values from the ESM.
@@ -631,7 +639,7 @@ def cost_docn(
         dtocn,
     )
     variance = hi_freq_variance(esm_oflux, cutoff=cutoff)
-    rss = np.sum( ((scc_oflux - esm_oflux) ** 2))
+    rss = np.sum((scc_oflux - esm_oflux) ** 2)
     n = float(esm_oflux.shape[0])
     ans = rss / (n * variance)
     return ans
@@ -680,7 +688,9 @@ def docn_func(
     # Run the ocean carbon emulation
     for i in range(1, ntime):
         dco2_ocn = oceancycle.update(
-            catm_u[i], catm_u[i - 1], dtocn_u[i],
+            catm_u[i],
+            catm_u[i - 1],
+            dtocn_u[i],
         )
         deltacocn[i] = dco2_ocn
 
