@@ -3,18 +3,16 @@ File to store any auxiliary functions for the calibration code.
 """
 
 import os
-import numpy as np
 
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
-
 from optimparallel import minimize_parallel
 
-from carbon_cycle_model.utils import load_esm_data
 from carbon_cycle_model.land_component.boxes.utils import general_calibration_fun
-from carbon_cycle_model.utils import butterworth
 from carbon_cycle_model.ocean_component.ocean_component import OceanCarbonCycle
+from carbon_cycle_model.utils import butterworth, load_esm_data
 
 
 class Normalizer:

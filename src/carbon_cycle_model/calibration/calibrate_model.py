@@ -27,9 +27,10 @@ of:
 
 import json
 import os
-import numpy as np
-from pathlib import Path
 import time as systime
+from pathlib import Path
+
+import numpy as np
 
 from carbon_cycle_model.calibration.utils import (
     Normalizer,
@@ -39,9 +40,9 @@ from carbon_cycle_model.calibration.utils import (
     costdocn1,
     docn_func,
     load_and_prepare_esm_data,
-    run_minimisation,
     plot_diagnostic,
     prepare_contour_data,
+    run_minimisation,
 )
 from carbon_cycle_model.land_component.boxes.utils import general_calibration_fun
 from carbon_cycle_model.utils import Data, make_all_dirs
