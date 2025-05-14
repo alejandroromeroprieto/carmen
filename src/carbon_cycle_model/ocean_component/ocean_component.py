@@ -169,9 +169,8 @@ class OceanCarbonCycle:
         # For context: OSCAR does the following:
         # d_0*par*e^(par*T))  (Eq__D_mld in link below) but this explodes for large Ts
         # https://github.com/tgasser/OSCAR/blob/master/core_fct/mod_process.py
-        docntemp = self.docn * (
-            1 / (1 + np.exp(self.docntemp * dt_ocn)) + 0.5
-        )
+        docntemp = self.docn * (1 / (1 + np.exp(self.docntemp * dt_ocn)) + 0.5)
+        # TODO: self.docnfac is not needed anymore
 
         cmol = mol_units_converter / docntemp
 
