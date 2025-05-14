@@ -72,7 +72,7 @@ class LandCarbonCycle:
         # Current timestep index
         self.timestep_ind = 0
 
-    def update(self, temp_ano, catm, npp_flag=True, fcva=0, fcsa=0, fcvs=0, cveg_esm=0, csoil_esm=0):
+    def update(self, temp_ano, catm, npp_flag=True, fcva=0, fcsa=0, fcvs=0):
         """Run the model one time step into the future.
 
         This requires the following input:
@@ -100,23 +100,22 @@ class LandCarbonCycle:
 
         # Calculate new carbon stocks using an implicit euler scheme
         if npp_flag:
-            # cveg*(1.0-dt*lit) + dt*(npp-fcva - fcvs)
+            # cveg*(1.0+dt*(npp-lit) - dt*(fcva + fcvs)
             cvegnew = self.cveg[self.timestep_ind] * (
-                1.0 - self.dt * (lit - npp)
-            ) + self.dt * (0 - fcva - fcvs)
+                1.0 + self.dt * (npp - lit)
+            ) - self.dt * (fcva + fcvs)
         else:
-            # cveg*(1.0-dt*(lit + vres)) + dt*(gpp-fcva - fcvs)
+            # cveg*(1.0+dt*(gpp - lit - vres)) - dt*(fcva + fcvs)
             cvegnew = self.cveg[self.timestep_ind] * (
-                1.0 - self.dt * (lit + vres - gpp)
-            ) + self.dt * (0 - fcva - fcvs)
-        # cvegnew = cveg_esm
+                1.0 + self.dt * (gpp - lit - vres)
+            ) - self.dt * (fcva + fcvs)
+
         # csoil*(1.0-dt*sres) + gamma*dt*cveg + dt*(fcvs-fcsa)
         csoilnew = (
             self.csoil[self.timestep_ind] * (1.0 - self.dt * sres)
-            + lit * self.dt * self.cveg[self.timestep_ind]
+            + lit * self.dt * cvegnew
             + self.dt * (fcvs - fcsa)
         )
-        # csoilnew = csoil_esm
 
         # Save new values
         self.veg_box.stock = self.cveg[self.timestep_ind + 1] = cvegnew
