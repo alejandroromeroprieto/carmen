@@ -3,4 +3,3 @@ __pycache__/
 *.py[cod]
 *$py.class
 src/carbon_cycle_model/my_calibration_results/
-src/carbon_cycle_model/additional_utils/
