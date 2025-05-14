@@ -127,7 +127,9 @@ class LandCarbonCycle:
         else:
             self.gpp[self.timestep_ind + 1] = gpp * cvegnew
             self.vres[self.timestep_ind + 1] = vres * cvegnew
-            self.npp[self.timestep_ind + 1] = (gpp - self.vres[self.timestep_ind + 1]) * cvegnew
+            self.npp[self.timestep_ind + 1] = (
+                gpp - self.vres[self.timestep_ind + 1]
+            ) * cvegnew
 
         self.fcva[self.timestep_ind + 1] = fcva
         self.fcsa[self.timestep_ind + 1] = fcsa
