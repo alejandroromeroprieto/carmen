@@ -76,7 +76,7 @@ SCENARIO = "CMIP6"
 #  - MRI-ESM2-0
 #  - NorESM2-LM
 #  - UKESM1-0-LL
-model_list = ["UKESM1-0-LL"]
+model_list = ["NorESM2-LM"]
 
 # List of scenarios to perform the calibration on. Possible options are:
 #  - ssp119
@@ -94,16 +94,16 @@ model_list = ["UKESM1-0-LL"]
 #  - historical
 #  - esm-historical
 experiment_list = [
-    "abrupt-4xCO2",
-    # "1pctco2",
+    # "abrupt-4xCO2",
+    "1pctco2",
     # "ssp119",
-    # "ssp126",
-    # "ssp245",
-    # "ssp370",
+    "ssp126",
+    "ssp245",
+    "ssp370",
     # "ssp434",
     # "ssp460",
-    # "ssp534-over",
-    # "ssp585",
+    "ssp534-over",
+    "ssp585",
     # "hist-noLu",
     # "esm-ssp585",
     # "esm-ssp534-over",
@@ -127,8 +127,8 @@ experiment_list = [
 #     "npp",
 #     "air_ocean_flux",
 # ]
-fluxes_to_calibrate = ["GPP", "litter", "vegetation_respiration", "soil_respiration", "npp", "air_ocean_flux"]
-# fluxes_to_calibrate = ["air_ocean_flux"]
+# fluxes_to_calibrate = ["GPP", "litter", "vegetation_respiration", "soil_respiration", "npp", "air_ocean_flux"]
+fluxes_to_calibrate = ["air_ocean_flux"]
 
 # realisations = ["default", "r2i1p1f2", "r3i1p1f2", "r4i1p1f2", "r8i1p1f2"]
 realisations = ["default"]
@@ -155,7 +155,7 @@ sres_range = np.array([[-3, 2.0], [-3, 2.5], [-1, 0], [0, 1000]])
 npp_range = np.array([[-3, 1], [-3, 4], [-1, 0], [0, 1000]])
 
 #                         docn,     docnfac   ocntemp   docntemp
-oflux_range = np.array([[30, 90.0], [-0.2, 10], [-0.2, 2], [-0.5, 10]])
+oflux_range = np.array([[30, 90.0], [-0.2, 10], [-0.2, 0.2], [-0.5, 10]])
 
 
 #  ========================  Initial guesses for solutions  ========================
