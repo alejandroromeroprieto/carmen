@@ -29,6 +29,8 @@ class VegetationBox(AbstractLandBox):
         # for training the parameters)
         self.lit0_par = self.lit0 / self.stock0
         self.vres0_par = self.vres0 / self.stock0
+        self.gpp0_par = self.gpp0 / self.stock0
+        self.npp0_par = self.npp0 / self.stock0
 
         self.vres_c_half = kwargs.get("vres_c_half", defaults.VRES_C_HALF)
         self.vres_c_l = kwargs.get("vres_c_l", defaults.VRES_C_L)
@@ -83,7 +85,7 @@ class VegetationBox(AbstractLandBox):
         """
 
         return general_calibration_fun(
-            self.gpp0,
+            self.gpp0_par,
             self.gpp_t_l,
             self.gpp_t_e,
             self.gpp_c_l,
@@ -105,7 +107,7 @@ class VegetationBox(AbstractLandBox):
         """
 
         return general_calibration_fun(
-            self.npp0,
+            self.npp0_par,
             self.npp_t_l,
             self.npp_t_e,
             self.npp_c_l,

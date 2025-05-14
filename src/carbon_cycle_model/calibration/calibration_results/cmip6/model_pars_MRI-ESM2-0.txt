@@ -1,1 +1,0 @@
-{"model": "MRI-ESM2-0", "docn": 42.82613146, "docnfac": 4.70007527, "ocntemp": 0.02660373, "docntemp": 0.2033341}

@@ -76,7 +76,7 @@ SCENARIO = "CMIP6"
 #  - MRI-ESM2-0
 #  - NorESM2-LM
 #  - UKESM1-0-LL
-model_list = ["NorESM2-LM"]
+model_list = ["UKESM1-0-LL"]
 
 # List of scenarios to perform the calibration on. Possible options are:
 #  - ssp119
@@ -89,16 +89,26 @@ model_list = ["NorESM2-LM"]
 #  - ssp585
 #  - 1pctCO2
 #  - hist-noLu
+#  - esm-ssp585
+#  - esm-ssp534-over
+#  - historical
+#  - esm-historical
 experiment_list = [
+    "abrupt-4xCO2",
     # "1pctco2",
     # "ssp119",
-    "ssp126",
-    "ssp245",
-    "ssp370",
+    # "ssp126",
+    # "ssp245",
+    # "ssp370",
     # "ssp434",
-    "ssp534-over",
-    "ssp585",
+    # "ssp460",
+    # "ssp534-over",
+    # "ssp585",
     # "hist-noLu",
+    # "esm-ssp585",
+    # "esm-ssp534-over",
+    # "historical",
+    # "esm-historical",
 ]
 
 
@@ -117,8 +127,8 @@ experiment_list = [
 #     "npp",
 #     "air_ocean_flux",
 # ]
-# fluxes_to_calibrate = ["GPP", "litter", "vegetation_respiration", "soil_respiration", "npp", "air_ocean_flux"]
-fluxes_to_calibrate = ["air_ocean_flux"]
+fluxes_to_calibrate = ["GPP", "litter", "vegetation_respiration", "soil_respiration", "npp", "air_ocean_flux"]
+# fluxes_to_calibrate = ["air_ocean_flux"]
 
 # realisations = ["default", "r2i1p1f2", "r3i1p1f2", "r4i1p1f2", "r8i1p1f2"]
 realisations = ["default"]
@@ -126,23 +136,26 @@ realisations = ["default"]
 # =============================   Parameter ranges  =============================
 # Here, we define the parameter space to explore in search for the optimum solution
 
+# -l_t values are constraint to -1, 0 to ensure a stable solution. I found a solution for CMCC with
+# sres = -5 and it was unstable
+
 #                     gpp_sts  gpp_ste   gpp_lt  gpp_c_half
-gpp_range = np.array([[-3, 5], [-3, 5], [-6, 6], [1, 1000]])
+gpp_range = np.array([[-3, 5], [-3, 5], [-1, 0], [1, 1000]])
 
 #                     lit_sts  lit_ste  lit_lt   sres_c_half
-lit_range = np.array([[-3, 5], [-3, 5], [-6, 6], [1, 1000]])
+lit_range = np.array([[-3, 5], [-3, 5], [-1, 0], [1, 1000]])
 
 #                      vres_sts  vres_ste  vres_lt  vres_c_half
-vres_range = np.array([[-3, 2.0], [-3, 2.5], [-6, 6], [1, 2000]])
+vres_range = np.array([[-3, 2.0], [-3, 2.5], [-1, 0], [1, 2000]])
 
 #                      sres_sts  sres_ste  sres_lt  sres_c_half
-sres_range = np.array([[-3, 2.0], [-3, 2.5], [0, 6], [0, 1000]])
+sres_range = np.array([[-3, 2.0], [-3, 2.5], [-1, 0], [0, 1000]])
 
 #                      npp_sts  npp_ste  npp_lt  npp_c_half
-npp_range = np.array([[-3, 1], [-3, 4], [-6, 6], [0, 1000]])
+npp_range = np.array([[-3, 1], [-3, 4], [-1, 0], [0, 1000]])
 
 #                         docn,     docnfac   ocntemp   docntemp
-oflux_range = np.array([[30, 90.0], [-0.2, 10], [-2, 2], [-5, 10]])
+oflux_range = np.array([[30, 90.0], [-0.2, 10], [-0.2, 2], [-0.5, 10]])
 
 
 #  ========================  Initial guesses for solutions  ========================
@@ -211,6 +224,8 @@ for ind, model in enumerate(model_list):
             PRE_IND_AVERAGE_LENGTH = 1
         elif "ssp" in experiment or "hist" in experiment:
             PRE_IND_AVERAGE_LENGTH = 20
+        elif "abrupt" in experiment:
+            PRE_IND_AVERAGE_LENGTH = 1
         else:
             raise ValueError("Experiment not recognised")
 
@@ -232,7 +247,9 @@ for ind, model in enumerate(model_list):
                 experiment,
                 recalc_emis=True,
                 ninit=PRE_IND_AVERAGE_LENGTH,
-                smoothing_alg={"type": "savgol", "pars": [21, 3]},
+                smoothing_alg={"type": "butterworth", "pars": [1]},
+                # smoothing_alg={"type": "savgol", "pars": [21, 3]},
+                # smoothing_alg={"type": "butterworth", "pars": [10]},
                 realisation=realisation,
             )
 
@@ -375,16 +392,16 @@ for ind, model in enumerate(model_list):
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
             scc_gpp = general_calibration_fun(
-                esm_data[model]["default"][experiment]["gpp0"],
+                esm_data[model][realisation][experiment]["gpp0"]/esm_data[model][realisation][experiment]["cveg"][0],
                 gpp_sts,
                 gpp_ste,
                 gpp_lt,
                 gpp_c_half,
-                esm_data[model]["default"][experiment]["cveg"],
-                esm_data[model]["default"][experiment]["cveg"][0],
-                esm_data[model]["default"][experiment]["catm"][0],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["cveg"],
+                esm_data[model][realisation][experiment]["cveg"][0],
+                esm_data[model][realisation][experiment]["catm"][0],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             )
 
             print("Making GPP plot data for:", model)
@@ -407,11 +424,11 @@ for ind, model in enumerate(model_list):
 
             # Constants we are going to be using for evaluating costs
             esm_vals = [
-                esm_data[model]["default"][experiment]["gpp0"],
-                esm_data[model]["default"][experiment]["catm"],
-                esm_data[model]["default"][experiment]["cveg"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["gpp"],
+                esm_data[model][realisation][experiment]["gpp0"],
+                esm_data[model][realisation][experiment]["catm"],
+                esm_data[model][realisation][experiment]["cveg"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["gpp"],
             ]
 
             # Contour par1 and par2 (gpp_sts, gpp_ste)
@@ -452,22 +469,23 @@ for ind, model in enumerate(model_list):
             # Save data for later diagnostic plots
             FLUX_NAME = "GPP"
             xlist = [
-                esm_data[model]["default"][experiment]["time"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["time"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
             title = [model + ", " + experiment, FLUX_NAME]
-            esm_flux = esm_data[model]["default"][experiment]["gpp"]
+            esm_flux = esm_data[model][realisation][experiment]["gpp"]
 
             # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
             if RETCOEF:
-                scc_gpp = scc_gpp / esm_data[model]["default"][experiment]["cveg"]
-                esm_flux = esm_flux / esm_data[model]["default"][experiment]["cveg"]
+                esm_flux = esm_flux / esm_data[model][realisation][experiment]["cveg"]
+            else:
+                scc_gpp = scc_gpp * esm_data[model][realisation][experiment]["cveg"]
 
             fit_gpp = Data(
-                time=esm_data[model]["default"][experiment]["time"],
+                time=esm_data[model][realisation][experiment]["time"],
                 xlist=xlist,
                 gcm=esm_flux,
                 scc=scc_gpp,
@@ -554,16 +572,16 @@ for ind, model in enumerate(model_list):
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
             scc_lit = general_calibration_fun(
-                esm_data[model]["default"][experiment]["lit0"],
+                esm_data[model][realisation][experiment]["lit0"]/esm_data[model][realisation][experiment]["cveg"][0],
                 lit_sts,
                 lit_ste,
                 lit_lt,
                 lit_c_half,
-                esm_data[model]["default"][experiment]["cveg"],
-                esm_data[model]["default"][experiment]["cveg"][0],
-                esm_data[model]["default"][experiment]["catm"][0],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["cveg"],
+                esm_data[model][realisation][experiment]["cveg"][0],
+                esm_data[model][realisation][experiment]["catm"][0],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             )
 
             print("Making litterfall plot data for:", model)
@@ -586,11 +604,11 @@ for ind, model in enumerate(model_list):
 
             # Constants we are going to be using for evaluating costs
             esm_vals = [
-                esm_data[model]["default"][experiment]["lit0"],
-                esm_data[model]["default"][experiment]["catm"],
-                esm_data[model]["default"][experiment]["cveg"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["lit"],
+                esm_data[model][realisation][experiment]["lit0"],
+                esm_data[model][realisation][experiment]["catm"],
+                esm_data[model][realisation][experiment]["cveg"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["lit"],
             ]
 
             # Contour par1 and par2 (lit_sts, lit_ste)
@@ -631,22 +649,23 @@ for ind, model in enumerate(model_list):
             # Save data for later diagnostic plots
             FLUX_NAME = "Litter"
             xlist = [
-                esm_data[model]["default"][experiment]["time"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["time"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
             title = [model + ", " + experiment, FLUX_NAME]
-            esm_flux = esm_data[model]["default"][experiment]["lit"]
+            esm_flux = esm_data[model][realisation][experiment]["lit"]
 
             # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
             if RETCOEF:
-                scc_lit = scc_lit / esm_data[model]["default"][experiment]["cveg"]
-                esm_flux = esm_flux / esm_data[model]["default"][experiment]["cveg"]
+                esm_flux = esm_flux / esm_data[model][realisation][experiment]["cveg"]
+            else:
+                scc_lit = scc_lit * esm_data[model][realisation][experiment]["cveg"]
 
             fit_litter = Data(
-                time=esm_data[model]["default"][experiment]["time"],
+                time=esm_data[model][realisation][experiment]["time"],
                 xlist=xlist,
                 gcm=esm_flux,
                 scc=scc_lit,
@@ -733,16 +752,16 @@ for ind, model in enumerate(model_list):
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
             scc_vres = general_calibration_fun(
-                esm_data[model]["default"][experiment]["ra0"],
+                esm_data[model][realisation][experiment]["ra0"]/esm_data[model][realisation][experiment]["cveg"][0],
                 vres_sts,
                 vres_ste,
                 vres_lt,
                 vres_c_half,
-                esm_data[model]["default"][experiment]["cveg"],
-                esm_data[model]["default"][experiment]["cveg"][0],
-                esm_data[model]["default"][experiment]["catm"][0],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["cveg"],
+                esm_data[model][realisation][experiment]["cveg"][0],
+                esm_data[model][realisation][experiment]["catm"][0],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             )
 
             print("Making vegetation respiration plot data for:", model)
@@ -765,11 +784,11 @@ for ind, model in enumerate(model_list):
 
             # Constants we are going to be using for evaluating costs
             esm_vals = [
-                esm_data[model]["default"][experiment]["ra0"],
-                esm_data[model]["default"][experiment]["catm"],
-                esm_data[model]["default"][experiment]["cveg"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["ra"],
+                esm_data[model][realisation][experiment]["ra0"],
+                esm_data[model][realisation][experiment]["catm"],
+                esm_data[model][realisation][experiment]["cveg"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["ra"],
             ]
 
             # Contour par1 and par2 (vres_sts, vres_ste)
@@ -810,22 +829,23 @@ for ind, model in enumerate(model_list):
             # Save data for later diagnostic plots
             FLUX_NAME = "vres"
             xlist = [
-                esm_data[model]["default"][experiment]["time"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["time"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
             title = [model + ", " + experiment, FLUX_NAME]
-            esm_flux = esm_data[model]["default"][experiment]["ra"]
+            esm_flux = esm_data[model][realisation][experiment]["ra"]
 
             # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
             if RETCOEF:
-                scc_vres = scc_vres / esm_data[model]["default"][experiment]["cveg"]
-                esm_flux = esm_flux / esm_data[model]["default"][experiment]["cveg"]
+                esm_flux = esm_flux / esm_data[model][realisation][experiment]["cveg"]
+            else:
+                scc_vres = scc_vres * esm_data[model][realisation][experiment]["cveg"]
 
             fit_vres = Data(
-                time=esm_data[model]["default"][experiment]["time"],
+                time=esm_data[model][realisation][experiment]["time"],
                 xlist=xlist,
                 gcm=esm_flux,
                 scc=scc_vres,
@@ -912,16 +932,16 @@ for ind, model in enumerate(model_list):
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
             scc_sres = general_calibration_fun(
-                esm_data[model]["default"][experiment]["rh0"],
+                esm_data[model][realisation][experiment]["rh0"]/esm_data[model][realisation][experiment]["csoil"][0],
                 sres_sts,
                 sres_ste,
                 sres_lt,
                 sres_c_half,
-                esm_data[model]["default"][experiment]["csoil"],
-                esm_data[model]["default"][experiment]["csoil"][0],
-                esm_data[model]["default"][experiment]["catm"][0],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["csoil"],
+                esm_data[model][realisation][experiment]["csoil"][0],
+                esm_data[model][realisation][experiment]["catm"][0],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             )
 
             print("Making soil respiration plot data for:", model)
@@ -944,11 +964,11 @@ for ind, model in enumerate(model_list):
 
             # Constants we are going to be using for evaluating costs
             esm_vals = [
-                esm_data[model]["default"][experiment]["rh0"],
-                esm_data[model]["default"][experiment]["catm"],
-                esm_data[model]["default"][experiment]["csoil"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["rh"],
+                esm_data[model][realisation][experiment]["rh0"],
+                esm_data[model][realisation][experiment]["catm"],
+                esm_data[model][realisation][experiment]["csoil"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["rh"],
             ]
 
             # Contour par1 and par2 (sres_sts, sres_ste)
@@ -989,22 +1009,23 @@ for ind, model in enumerate(model_list):
             # Save data for later diagnostic plots
             FLUX_NAME = "sres"
             xlist = [
-                esm_data[model]["default"][experiment]["time"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["time"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
             title = [model + ", " + experiment, FLUX_NAME]
-            esm_flux = esm_data[model]["default"][experiment]["rh"]
+            esm_flux = esm_data[model][realisation][experiment]["rh"]
 
             # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
             if RETCOEF:
-                scc_sres = scc_sres / esm_data[model]["default"][experiment]["csoil"]
-                esm_flux = esm_flux / esm_data[model]["default"][experiment]["csoil"]
+                esm_flux = esm_flux / esm_data[model][realisation][experiment]["csoil"]
+            else:
+                scc_sres = scc_sres * esm_data[model][realisation][experiment]["csoil"]
 
             fit_sres = Data(
-                time=esm_data[model]["default"][experiment]["time"],
+                time=esm_data[model][realisation][experiment]["time"],
                 xlist=xlist,
                 gcm=esm_flux,
                 scc=scc_sres,
@@ -1091,16 +1112,16 @@ for ind, model in enumerate(model_list):
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
             scc_npp = general_calibration_fun(
-                esm_data[model]["default"][experiment]["npp0"],
+                esm_data[model][realisation][experiment]["npp0"]/esm_data[model][realisation][experiment]["cveg"][0],
                 npp_sts,
                 npp_ste,
                 npp_lt,
                 npp_c_half,
-                esm_data[model]["default"][experiment]["cveg"],
-                esm_data[model]["default"][experiment]["cveg"][0],
-                esm_data[model]["default"][experiment]["catm"][0],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["cveg"],
+                esm_data[model][realisation][experiment]["cveg"][0],
+                esm_data[model][realisation][experiment]["catm"][0],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             )
 
             print("Making npp plot data for:", model)
@@ -1123,11 +1144,11 @@ for ind, model in enumerate(model_list):
 
             # Constants we are going to be using for evaluating costs
             esm_vals = [
-                esm_data[model]["default"][experiment]["npp0"],
-                esm_data[model]["default"][experiment]["catm"],
-                esm_data[model]["default"][experiment]["cveg"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["npp"],
+                esm_data[model][realisation][experiment]["npp0"],
+                esm_data[model][realisation][experiment]["catm"],
+                esm_data[model][realisation][experiment]["cveg"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["npp"],
             ]
 
             # Contour par1 and par2 (npp_sts, npp_ste)
@@ -1168,22 +1189,23 @@ for ind, model in enumerate(model_list):
             # Save data for later diagnostic plots
             FLUX_NAME = "npp"
             xlist = [
-                esm_data[model]["default"][experiment]["time"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["time"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
             title = [model + ", " + experiment, FLUX_NAME]
-            esm_flux = esm_data[model]["default"][experiment]["npp"]
+            esm_flux = esm_data[model][realisation][experiment]["npp"]
 
             # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
             if RETCOEF:
-                scc_npp = scc_npp / esm_data[model]["default"][experiment]["cveg"]
-                esm_flux = esm_flux / esm_data[model]["default"][experiment]["cveg"]
+                esm_flux = esm_flux / esm_data[model][realisation][experiment]["cveg"]
+            else:
+                scc_npp = scc_npp * esm_data[model][realisation][experiment]["cveg"]
 
             fit_npp = Data(
-                time=esm_data[model]["default"][experiment]["time"],
+                time=esm_data[model][realisation][experiment]["time"],
                 xlist=xlist,
                 gcm=esm_flux,
                 scc=scc_npp,
@@ -1227,15 +1249,13 @@ for ind, model in enumerate(model_list):
 
         initial_docn_guess_bar = docn_normalizer.normalise(initial_oflux_guess_dim)
 
-        p0_dim = oflux_range.mean(axis=1)
-        p0_bar = docn_normalizer.normalise(initial_oflux_guess_dim)
         parlo = np.zeros(NPAR)
         parhi = np.ones(NPAR)
         for i in range(NPAR):
             if docn_normalizer.pranges[i, 0] == docn_normalizer.pranges[i, 1]:
                 parhi[i] = 0.0
 
-        calibration_args = (docn_normalizer, esm_data, model, DTIME_0)
+        calibration_args = (docn_normalizer, esm_data, model, DTIME_0, realisation)
 
         print("Please be patient, this step takes a while...")
         # raise AssertionError('Stop for debugging...')
@@ -1250,6 +1270,7 @@ for ind, model in enumerate(model_list):
             attempts=NMSAMP_DOCN,
             ftol=F_TOL,
         )
+
 
         systime_docnend = systime.time()
 
@@ -1271,24 +1292,24 @@ for ind, model in enumerate(model_list):
         num_steps = round(
             1
             + (
-                esm_data[model]["default"][experiment]["time"][-1]
-                - esm_data[model]["default"][experiment]["time"][0]
+                esm_data[model][realisation][experiment]["time"][-1]
+                - esm_data[model][realisation][experiment]["time"][0]
             )
             / DTIME_0
         )
         for experiment in experiment_list:
             scc_oflux = docn_func(
-                esm_data[model]["default"][experiment]["catm0"],
+                esm_data[model][realisation][experiment]["catm0"],
                 DTIME_0,
                 num_steps,
-                esm_data[model]["default"][experiment]["time"][0],
+                esm_data[model][realisation][experiment]["time"][0],
                 docn,
                 docnfac,
                 ocntemp,
                 docntemp,
-                esm_data[model]["default"][experiment]["time"],
-                esm_data[model]["default"][experiment]["catm"],
-                esm_data[model]["default"][experiment]["dtocn"],
+                esm_data[model][realisation][experiment]["time"],
+                esm_data[model][realisation][experiment]["catm"],
+                esm_data[model][realisation][experiment]["dtocn"],
             )
 
             print("Making OFLUX plot data for:", model)
@@ -1307,15 +1328,16 @@ for ind, model in enumerate(model_list):
             par2 = np.linspace(parlo[1], parhi[1], num=N4CON, endpoint=True)
 
             gcm_values = [
-                esm_data[model]["default"][experiment]["catm0"],
+                esm_data[model][realisation][experiment]["catm0"],
                 DTIME_0,
                 num_steps,
-                esm_data[model]["default"][experiment]["time"][0],
-                esm_data[model]["default"][experiment]["time"],
-                esm_data[model]["default"][experiment]["catm"],
-                esm_data[model]["default"][experiment]["oflux"],
-                esm_data[model]["default"][experiment]["dtocn"],
+                esm_data[model][realisation][experiment]["time"][0],
+                esm_data[model][realisation][experiment]["time"],
+                esm_data[model][realisation][experiment]["catm"],
+                esm_data[model][realisation][experiment]["oflux"],
+                esm_data[model][realisation][experiment]["dtocn"],
             ]
+
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par1,
                 par2=par2,
@@ -1337,14 +1359,14 @@ for ind, model in enumerate(model_list):
             par2 = np.linspace(parlo[3], parhi[3], num=N4CON, endpoint=True)
 
             gcm_values = [
-                esm_data[model]["default"][experiment]["catm0"],
+                esm_data[model][realisation][experiment]["catm0"],
                 DTIME_0,
                 num_steps,
-                esm_data[model]["default"][experiment]["time"][0],
-                esm_data[model]["default"][experiment]["time"],
-                esm_data[model]["default"][experiment]["catm"],
-                esm_data[model]["default"][experiment]["oflux"],
-                esm_data[model]["default"][experiment]["dtocn"],
+                esm_data[model][realisation][experiment]["time"][0],
+                esm_data[model][realisation][experiment]["time"],
+                esm_data[model][realisation][experiment]["catm"],
+                esm_data[model][realisation][experiment]["oflux"],
+                esm_data[model][realisation][experiment]["dtocn"],
             ]
 
             par1dim, par2dim, costs = prepare_contour_data(
@@ -1365,17 +1387,17 @@ for ind, model in enumerate(model_list):
             #####
             FLUX_NAME = r"$f_o$"
             xlist = [
-                esm_data[model]["default"][experiment]["time"],
-                esm_data[model]["default"][experiment]["dtglb"],
-                esm_data[model]["default"][experiment]["catm"],
+                esm_data[model][realisation][experiment]["time"],
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
             ]
             xlabel = ["Year", r"$\Delta T$", "c_atm"]
             title = [model + ", " + experiment, FLUX_NAME]
 
-            gcm = esm_data[model]["default"][experiment]["oflux"]
+            gcm = esm_data[model][realisation][experiment]["oflux"]
 
             fit_oflux = Data(
-                time=esm_data[model]["default"][experiment]["time"],
+                time=esm_data[model][realisation][experiment]["time"],
                 xlist=xlist,
                 gcm=gcm,
                 scc=scc_oflux,
@@ -1416,7 +1438,7 @@ for ind, model in enumerate(model_list):
 
         plot_diagnostic(
             OUT_DIR,
-            esm_data[model]["default"][experiment],
+            esm_data[model][realisation][experiment],
             fit[i :: len(experiment_list)],
             outplot=outplot,
             fontsize=10,

@@ -106,6 +106,7 @@ def cli_parser():
         # ],
     }
     scenario_opts = [
+        "abrupt-4xCO2",
         "1pctco2",
         # "1pctco2-cdr",
         "ssp119",
@@ -121,12 +122,14 @@ def cli_parser():
         # "historical",
         # "cross_experiment",
         # "holistic",
+        "hist-noLu",
     ]
     parser = argparse.ArgumentParser()
 
     parser.add_argument("models", nargs="+")
     parser.add_argument("-s", "--scenario", choices=scenario_opts, default="ssp585")
     parser.add_argument("-p", "--scenario_pars", choices=scenario_opts, default=None)
+    parser.add_argument("-r", "--realisation", default="default")
     parser.add_argument("--save", action=argparse.BooleanOptionalAction)
     parser.add_argument("--npp", action=argparse.BooleanOptionalAction)
 
@@ -145,4 +148,4 @@ def cli_parser():
     # TODO: maybe have a table somewhere in git with all available models so I can just
     # TODO: link to it?
 
-    return args.models, args.scenario, args.scenario_pars, args.save, args.npp
+    return args.models, args.scenario, args.scenario_pars, args.realisation, args.save, args.npp

@@ -288,7 +288,14 @@ def run_minimisation(func, p0, inargs, xlo, xhi, ftol=1e-6, attempts=5):
                 p_bar = p_out
                 costmin = costout
             print(
-                "\n> Iteration=", ii + 2, ", costmin=", costmin, ", costout=", costout
+                "\n> Iteration=",
+                ii + 2,
+                ", costmin=",
+                costmin,
+                ", costout=",
+                costout,
+                ", termination reason: ",
+                outmin.message
             )
             print("  p_bar=", p_bar)
 
@@ -359,7 +366,7 @@ def calculate_cost_gen_func_cross_experiment(
             # else:
             #     np.ones()
             cost += cost_gen_func(
-                esm_data[model][realisation][experiment][flux0],
+                esm_data[model][realisation][experiment][flux0]/esm_data[model][realisation][experiment][stock][0],
                 par_t_l,
                 par_t_e,
                 par_c_l,
@@ -401,7 +408,7 @@ def calculate_cost_gen_func(param, normalizer, flux0, catm, stock, dtglb, esm_fl
     # param are normalized (range [0,1]), so use inv method to 'de-normalize'
     par_t_l, par_t_e, par_c_l, par_c_half = normalizer.inv(param)
     ans1 = cost_gen_func(
-        flux0, par_t_l, par_t_e, par_c_l, par_c_half, dtglb, catm, stock, esm_flux
+        flux0/stock[0], par_t_l, par_t_e, par_c_l, par_c_half, dtglb, catm, stock, esm_flux
     )
     return np.log(ans1)
 
@@ -459,6 +466,7 @@ def cost_gen_func(
         dtglb,
         catm,
     )
+    scc_val = scc_val*stock
     variance = hi_freq_variance(esm_flux, cutoff=cutoff)
     cost = np.sum((scc_val - esm_flux) ** 2)
     n = float(esm_flux.shape[0])

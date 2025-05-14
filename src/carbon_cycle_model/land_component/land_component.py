@@ -72,7 +72,7 @@ class LandCarbonCycle:
         # Current timestep index
         self.timestep_ind = 0
 
-    def update(self, temp_ano, catm, npp_flag=True, fcva=0, fcsa=0, fcvs=0):
+    def update(self, temp_ano, catm, npp_flag=True, fcva=0, fcsa=0, fcvs=0, cveg_esm=0, csoil_esm=0):
         """Run the model one time step into the future.
 
         This requires the following input:
@@ -102,20 +102,21 @@ class LandCarbonCycle:
         if npp_flag:
             # cveg*(1.0-dt*lit) + dt*(npp-fcva - fcvs)
             cvegnew = self.cveg[self.timestep_ind] * (
-                1.0 - self.dt * (lit)
-            ) + self.dt * (npp - fcva - fcvs)
+                1.0 - self.dt * (lit - npp)
+            ) + self.dt * (0 - fcva - fcvs)
         else:
             # cveg*(1.0-dt*(lit + vres)) + dt*(gpp-fcva - fcvs)
             cvegnew = self.cveg[self.timestep_ind] * (
-                1.0 - self.dt * (lit + vres)
-            ) + self.dt * (gpp - fcva - fcvs)
-
+                1.0 - self.dt * (lit + vres - gpp)
+            ) + self.dt * (0 - fcva - fcvs)
+        # cvegnew = cveg_esm
         # csoil*(1.0-dt*sres) + gamma*dt*cveg + dt*(fcvs-fcsa)
         csoilnew = (
             self.csoil[self.timestep_ind] * (1.0 - self.dt * sres)
-            + lit * self.dt * cvegnew
+            + lit * self.dt * self.cveg[self.timestep_ind]
             + self.dt * (fcvs - fcsa)
         )
+        # csoilnew = csoil_esm
 
         # Save new values
         self.veg_box.stock = self.cveg[self.timestep_ind + 1] = cvegnew
@@ -123,11 +124,11 @@ class LandCarbonCycle:
         self.lit[self.timestep_ind + 1] = lit * cvegnew
         self.sres[self.timestep_ind + 1] = sres * csoilnew
         if npp_flag:
-            self.npp[self.timestep_ind + 1] = npp
+            self.npp[self.timestep_ind + 1] = npp * cvegnew
         else:
-            self.gpp[self.timestep_ind + 1] = gpp
+            self.gpp[self.timestep_ind + 1] = gpp * cvegnew
             self.vres[self.timestep_ind + 1] = vres * cvegnew
-            self.npp[self.timestep_ind + 1] = gpp - self.vres[self.timestep_ind + 1]
+            self.npp[self.timestep_ind + 1] = (gpp - self.vres[self.timestep_ind + 1]) * cvegnew
 
         self.fcva[self.timestep_ind + 1] = fcva
         self.fcsa[self.timestep_ind + 1] = fcsa

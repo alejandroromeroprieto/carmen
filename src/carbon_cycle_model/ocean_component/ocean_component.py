@@ -147,18 +147,18 @@ class OceanCarbonCycle:
         # TODO: https://github.com/tgasser/OSCAR/blob/master/core_fct/mod_process.py
         # Modulation of the mixed layer depth. We follow OSCAR here, and use an
         # exponential dependence on sea surface temperature.
-        docntemp = self.docn * (
-            1.0
-            + np.maximum(
-                -0.5,
-                np.minimum(1.0, self.docnfac * (np.exp(self.docntemp * dt_ocn) - 1)),
-            )
-        )
+        # docntemp = self.docn * (
+        #     1.0
+        #     + np.maximum(
+        #         -0.5,
+        #         np.minimum(1.0, self.docnfac * (np.exp(self.docntemp * dt_ocn) - 1)),
+        #     )
+        # )
         # docntemp = self.docn * np.maximum(0.5, np.minimum(2, (1 + self.docnfac * dt_ocn) * np.exp(self.docntemp * dt_ocn)))
         # docntemp = self.docn * np.maximum(0.5, np.minimum(2, self.docnfac * np.exp(self.docntemp * dt_ocn)))
         # docntemp = self.docn * np.maximum(0.5, np.minimum(2, self.docnfac * np.exp(self.docntemp * dt_ocn)))
         # docntemp = self.docn * (self.docnfac/(1+np.exp(self.docntemp * dt_ocn)) + 0.5) # 4.664868421746609
-        # docntemp = self.docn * (1/(1+np.exp(self.docntemp * dt_ocn)) + 0.5)  #  4.678074064298765
+        docntemp = self.docn * (1/(1+np.exp(self.docntemp * dt_ocn)) + 0.5)  #  4.678074064298765
 
         cmol = mol_units_converter / docntemp
 
@@ -188,8 +188,8 @@ class OceanCarbonCycle:
             # I guess that we take catm0 as in pre-industrial the partial pressures
             # would be the same
             # due to the equilibrium assumption.
-            cocn = (self.catm0 + psum) * np.exp(self.ocntemp * dt_ocn) # original
-            # cocn = (self.catm0 + psum) * (1 / (1 + np.exp(self.ocntemp * dt_ocn)) + 0.5)
+            # cocn = (self.catm0 + psum) * np.exp(self.ocntemp * dt_ocn) # original
+            cocn = (self.catm0 + psum) * (1 / (1 + np.exp(self.ocntemp * dt_ocn)) + 0.5)
             uptakenew = (GAS_EXCHANGE_COEF / OCEAN_AREA) * (catmk - cocn)
             self.ocn_uptake[istep] = uptakenew
             total_uptake += uptakenew * OCEAN_AREA * dtstep * PPM2GT

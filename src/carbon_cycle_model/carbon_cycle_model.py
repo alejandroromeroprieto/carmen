@@ -86,7 +86,7 @@ class CarbonCycle:
                     ninit=ninit_scenario,
                     smoothing_pars={"type": "savgol", "pars": [21, 3]},
                 )
-            
+
                 initial_year = esm_data.time[0]
                 final_year = esm_data.time[-1]
 
@@ -224,6 +224,9 @@ class CarbonCycle:
         # Cumulative emissions, used to track carbon losses
         cems = np.zeros(self.num_steps)
 
+        cveg_i = np.interp(time_i, self.esm_data.time, self.esm_data.cveg)
+        csoil_i = np.interp(time_i, self.esm_data.time, self.esm_data.csoil)
+
         # Run the components forward
         for i in range(0, self.num_steps - 1):
             timestep = time_i[i + 1] - time_i[i]
@@ -242,6 +245,8 @@ class CarbonCycle:
                 fcva=fcva_i[i],
                 fcsa=fcsa_i[i],
                 fcvs=fcvs_i[i],
+                cveg_esm=cveg_i[i],
+                csoil_esm=csoil_i[i],
             )
             del_lnd = delta_cveg + delta_csoil
 
@@ -262,6 +267,7 @@ class CarbonCycle:
             )
 
             self.catm[i + 1] = self.catm[i] + (dt_ems - delta_ocn - del_lnd) / PPM2GT
+            self.emis[i+1] = emis_i[i]
 
             self.current_step += 1
 
@@ -632,7 +638,8 @@ def main():
     """
 
     # Smoothing to perform on input ESM data
-    smoothing_algorithm = {"type": "savgol", "pars": [21, 3]}
+    # smoothing_algorithm = {"type": "butterworth", "pars": [21, 3]}
+    smoothing_algorithm = {"type": "butterworth", "pars": [1]}
 
     # Numerical instability can arise if dtoccmax is too large. We recommend to keep it
     # to 0.2 or less.
@@ -643,7 +650,7 @@ def main():
     recalc_emis = True
 
     # Run the cli parser and retrieve the required information
-    models, scenario, scenario_pars, _, npp_flag = cli_parser()
+    models, scenario, scenario_pars, realisation, _, npp_flag = cli_parser()
 
     # Run emulation for each model
     for model in models:
@@ -652,6 +659,8 @@ def main():
         # 1pctco2(-cdr) just take the first value, as subsequent values will
         # already have significantly diverged from equilibrium.
         if scenario in ["1pctco2", "1pctco2-cdr"]:
+            ninit_scenario = 1
+        elif "abrupt" in scenario:
             ninit_scenario = 1
         else:
             ninit_scenario = 20
@@ -664,7 +673,12 @@ def main():
             scen_to_use = SCEN_DIR
             pars_to_use = PARS_DIR
 
-        data_file = Path(__file__).parent / scen_to_use / f"sce_{model}_{scenario}.txt"
+        if realisation != "default":
+            scen_to_use = SCEN_DIR + "/other_realisations"
+            data_file = Path(__file__).parent / scen_to_use / f"sce_{model}_{scenario}_{realisation}.txt"
+        else:
+            data_file = Path(__file__).parent / scen_to_use / f"sce_{model}_{scenario}.txt"
+
         print("\nLoading ESM data from: ", data_file)
 
         esm_data = load_esm_data(
@@ -707,11 +721,11 @@ def main():
 
         cc_emulator.create_plots(model)
 
-        plt.plot(cc_emulator.esm_data.dtglb, label="GMST")
-        plt.plot(cc_emulator.esm_data.dtocn, label="SST")
-        plt.plot(0.869*cc_emulator.esm_data.dtglb + 0.035, label="emulated SST")
-        plt.legend()
-        plt.show()
+        # plt.plot(cc_emulator.esm_data.dtglb, label="GMST")
+        # plt.plot(cc_emulator.esm_data.dtocn, label="SST")
+        # plt.plot(0.869*cc_emulator.esm_data.dtglb + 0.035, label="emulated SST")
+        # plt.legend()
+        # plt.show()
 
 
 if __name__ == "__main__":
