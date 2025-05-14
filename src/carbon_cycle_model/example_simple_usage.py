@@ -74,6 +74,8 @@ esm_data = load_esm_data(
 for i in range(len(esm_data.time)):  # Assuming esm data is yearly
     for j in range(NUM_STEPS):
         new_input = {
+            # emis is technically the rate of yearly emissions, so if the step was
+            # smaller than a year it would need to be converted into year-equivalent
             "emis": esm_data.gcmemis[i],
             "dtocn": esm_data.dtocn[i],
             "dtglb": esm_data.dtglb[i],
