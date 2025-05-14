@@ -35,7 +35,6 @@ import numpy as np
 from carbon_cycle_model.calibration.utils import (
     Normalizer,
     load_and_prepare_esm_data,
-    get_general_average,
     run_minimisation,
     calculate_cost_gen_func_cross_experiment,
     calculate_cost_gen_func,
@@ -76,7 +75,7 @@ SCENARIO = "CMIP6"
 #  - MRI-ESM2-0
 #  - NorESM2-LM
 #  - UKESM1-0-LL
-model_list = ["NorESM2-LM"]
+model_list = ["UKESM1-0-LL"]
 
 # List of scenarios to perform the calibration on. Possible options are:
 #  - ssp119
@@ -127,8 +126,14 @@ experiment_list = [
 #     "npp",
 #     "air_ocean_flux",
 # ]
-# fluxes_to_calibrate = ["GPP", "litter", "vegetation_respiration", "soil_respiration", "npp", "air_ocean_flux"]
-fluxes_to_calibrate = ["air_ocean_flux"]
+fluxes_to_calibrate = [
+    "GPP",
+    "litter",
+    "vegetation_respiration",
+    "soil_respiration",
+    "npp",
+    "air_ocean_flux",
+]
 
 # realisations = ["default", "r2i1p1f2", "r3i1p1f2", "r4i1p1f2", "r8i1p1f2"]
 realisations = ["default"]
@@ -136,8 +141,8 @@ realisations = ["default"]
 # =============================   Parameter ranges  =============================
 # Here, we define the parameter space to explore in search for the optimum solution
 
-# -l_t values are constraint to -1, 0 to ensure a stable solution. I found a solution for CMCC with
-# sres = -5 and it was unstable
+# -l_t values are constraint to -1, 0 to ensure a stable solution. I found a solution
+# for CMCC with sres = -5 and it was unstable
 
 #                     gpp_sts  gpp_ste   gpp_lt  gpp_c_half
 gpp_range = np.array([[-3, 5], [-3, 5], [-1, 0], [1, 1000]])
@@ -155,7 +160,7 @@ sres_range = np.array([[-3, 2.0], [-3, 2.5], [-1, 0], [0, 1000]])
 npp_range = np.array([[-3, 1], [-3, 4], [-1, 0], [0, 1000]])
 
 #                         docn,     docnfac   ocntemp   docntemp
-oflux_range = np.array([[30, 90.0], [-0.2, 10], [-0.2, 0.2], [-0.5, 10]])
+oflux_range = np.array([[30, 90.0], [-0.2, 10], [-1, 0.2], [-0.5, 10]])
 
 
 #  ========================  Initial guesses for solutions  ========================
@@ -170,7 +175,7 @@ initial_sres_guess_dim = np.array([0.54, 0.15, 0, 10])
 #                      npp_sts  npp_ste  npp_lt  npp_c_half
 initial_npp_guess_dim = np.array([0, 0, 0, 10])
 #                             docn  docnfac  ocntemp  docntemp
-initial_oflux_guess_dim = np.array([42.82653991, 4.70007527, 0.02405834, -0.00483786])
+initial_oflux_guess_dim = np.array([55, 0.33, 0.05, -0.1])
 
 
 # Tolerance values for our calibration
@@ -187,9 +192,7 @@ OUT_DIR = CWD + "/src/carbon_cycle_model/calibration/calibration_results"
 
 # Path and prefix to all input data files
 PREFIX = CWD + "/src/carbon_cycle_model/data/scenarios/"
-PREFIX_DETRENDED = (
-    CWD + "/src/carbon_cycle_model/data/scenarios/detrended_wrt_decade/"
-)
+PREFIX_DETRENDED = CWD + "/src/carbon_cycle_model/data/scenarios/detrended_wrt_decade/"
 
 # Number of times we cycle through the optimization for each component
 # to try to avoid potential local minima:
@@ -200,11 +203,12 @@ NMSAMP_VRES = NUM_REPEAT
 NMSAMP_SRES = NUM_REPEAT
 NMSAMP_NPP = NUM_REPEAT
 # ocean function, and by extension its calibration, is relatively slower
+# So you may want to choose a smaller value here
 NMSAMP_DOCN = 1
 
-# Switch that allows either return of the coefficient gamma from lit_func (RETCOEF=True),
-# or return of litter flux gamma*V (RETCOEF=False). Determines which diagnostic is
-# plotted.
+# Switch that allows either return of the flux coefficient (i.e. flux/stock)
+# (RETCOEF=True), or return of absolute flux (RETCOEF=False). It also
+# determines which diagnostic is plotted.
 RETCOEF = False
 
 esm_data = {}
@@ -248,6 +252,7 @@ for ind, model in enumerate(model_list):
                 recalc_emis=True,
                 ninit=PRE_IND_AVERAGE_LENGTH,
                 smoothing_alg={"type": "butterworth", "pars": [1]},
+                # Different available smoothing options
                 # smoothing_alg={"type": "savgol", "pars": [21, 3]},
                 # smoothing_alg={"type": "butterworth", "pars": [10]},
                 realisation=realisation,
@@ -255,69 +260,15 @@ for ind, model in enumerate(model_list):
 
             if model in esm_data:
                 if realisation in esm_data[model]:
-                    esm_data[model][realisation].update(expriment_data[model][realisation])
+                    esm_data[model][realisation].update(
+                        expriment_data[model][realisation]
+                    )
                 else:
                     esm_data[model].update(expriment_data[model])
             else:
                 esm_data.update(expriment_data)
 
-    # Since we may be calibrating to several experiments, take an average of the initial
-    # quantitites across experiments (even though they should be the same)
     model_pars["model"] = model
-    # model_pars["cveg0"] = get_general_average(
-    #     esm_data,
-    #     model,
-    #     "cveg0",
-    #     N_ROUND,
-    # )
-    # model_pars["csoil0"] = get_general_average(
-    #     esm_data,
-    #     model,
-    #     "csoil0",
-    #     N_ROUND,
-    # )
-    # model_pars["catm0"] = get_general_average(
-    #     esm_data,
-    #     model,
-    #     "catm0",
-    #     N_ROUND,
-    # )
-    # model_pars["npp0"] = get_general_average(
-    #     esm_data,
-    #     model,
-    #     "npp0",
-    #     N_ROUND,
-    # )
-    # model_pars["gpp0"] = get_general_average(
-    #     esm_data,
-    #     model,
-    #     "gpp0",
-    #     N_ROUND,
-    # )
-    # model_pars["lu0"] = get_general_average(
-    #     esm_data,
-    #     model,
-    #     "lu0",
-    #     N_ROUND,
-    # )
-    # model_pars["lit0"] = get_general_average(
-    #     esm_data,
-    #     model,
-    #     "lit0",
-    #     N_ROUND,
-    # )
-    # model_pars["sres0"] = get_general_average(
-    #     esm_data,
-    #     model,
-    #     "rh0",
-    #     N_ROUND,
-    # )
-    # model_pars["vres0"] = get_general_average(
-    #     esm_data,
-    #     model,
-    #     "ra0",
-    #     N_ROUND,
-    # )
 
     # Make a list of individual fits, and use plot_diagnostic to make some plots.
     fit = []
@@ -392,7 +343,8 @@ for ind, model in enumerate(model_list):
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
             scc_gpp = general_calibration_fun(
-                esm_data[model][realisation][experiment]["gpp0"]/esm_data[model][realisation][experiment]["cveg"][0],
+                esm_data[model][realisation][experiment]["gpp0"]
+                / esm_data[model][realisation][experiment]["cveg"][0],
                 gpp_sts,
                 gpp_ste,
                 gpp_lt,
@@ -572,7 +524,8 @@ for ind, model in enumerate(model_list):
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
             scc_lit = general_calibration_fun(
-                esm_data[model][realisation][experiment]["lit0"]/esm_data[model][realisation][experiment]["cveg"][0],
+                esm_data[model][realisation][experiment]["lit0"]
+                / esm_data[model][realisation][experiment]["cveg"][0],
                 lit_sts,
                 lit_ste,
                 lit_lt,
@@ -752,7 +705,8 @@ for ind, model in enumerate(model_list):
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
             scc_vres = general_calibration_fun(
-                esm_data[model][realisation][experiment]["ra0"]/esm_data[model][realisation][experiment]["cveg"][0],
+                esm_data[model][realisation][experiment]["ra0"]
+                / esm_data[model][realisation][experiment]["cveg"][0],
                 vres_sts,
                 vres_ste,
                 vres_lt,
@@ -932,7 +886,8 @@ for ind, model in enumerate(model_list):
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
             scc_sres = general_calibration_fun(
-                esm_data[model][realisation][experiment]["rh0"]/esm_data[model][realisation][experiment]["csoil"][0],
+                esm_data[model][realisation][experiment]["rh0"]
+                / esm_data[model][realisation][experiment]["csoil"][0],
                 sres_sts,
                 sres_ste,
                 sres_lt,
@@ -1112,7 +1067,8 @@ for ind, model in enumerate(model_list):
         for experiment in experiment_list:
             # Call same function that is minimized to get SCC prediction of GPP
             scc_npp = general_calibration_fun(
-                esm_data[model][realisation][experiment]["npp0"]/esm_data[model][realisation][experiment]["cveg"][0],
+                esm_data[model][realisation][experiment]["npp0"]
+                / esm_data[model][realisation][experiment]["cveg"][0],
                 npp_sts,
                 npp_ste,
                 npp_lt,
@@ -1270,7 +1226,6 @@ for ind, model in enumerate(model_list):
             attempts=NMSAMP_DOCN,
             ftol=F_TOL,
         )
-
 
         systime_docnend = systime.time()
 
@@ -1439,7 +1394,7 @@ for ind, model in enumerate(model_list):
         plot_diagnostic(
             OUT_DIR,
             esm_data[model][realisation][experiment],
-            fit[i :: len(experiment_list)],
+            fit[i::len(experiment_list)],
             outplot=outplot,
             fontsize=10,
             xsize=16.0,
