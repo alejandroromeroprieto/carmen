@@ -17,7 +17,7 @@ from carbon_cycle_model import defaults
 class VegetationBox(AbstractLandBox):
     """Vegetation box class."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, num_steps, timestep, **kwargs):
         super().__init__(kwargs.get("cveg0", defaults.CVEG0_DEFAULT))
         self.catm0 = kwargs.get("catm0", defaults.CATM0_DEFAULT)
         self.gpp0 = kwargs.get("gpp0", defaults.GPP0_DEFAULT)
@@ -29,30 +29,116 @@ class VegetationBox(AbstractLandBox):
         # for training the parameters)
         self.lit0_par = self.lit0 / self.stock0
         self.vres0_par = self.vres0 / self.stock0
-        self.gpp0_par = self.gpp0 / self.stock0
-        self.npp0_par = self.npp0 / self.stock0
+        # self.gpp0_par = self.gpp0 / self.stock0
+        # self.npp0_par = self.npp0 / self.stock0
+        self.gpp0_par = self.gpp0
+        self.npp0_par = self.npp0
 
         self.vres_c_half = kwargs.get("vres_c_half", defaults.VRES_C_HALF)
         self.vres_c_l = kwargs.get("vres_c_l", defaults.VRES_C_L)
         self.vres_t_e = kwargs.get("vres_t_e", defaults.VRES_T_E)
         self.vres_t_l = kwargs.get("vres_t_l", defaults.VRES_T_L)
+        self.vres_c_e = kwargs.get("vres_c_e")
+        self.vres_hyst = kwargs.get("vres_hyst")
+
+        # inertia parameters
+        self.vres_fast_inertia = kwargs.get("vres_fast", 1) ** timestep
+        self.vres_slow_inertia = kwargs.get("vres_slow", 1) ** timestep
+        self.vres_prev_fast_inertia = 0.0
+        self.vres_prev_slow_inertia = 0.0
+
+        self.vres_c_tan = kwargs.get("vres_c_tan")
+        self.vres_c_tan2 = kwargs.get("vres_c_tan2", 0)
+
+        # gain_fast_cal = 1.0 / (1 - kwargs.get("vres_fast", 1))
+        # gain_fast_run = 1.0 / (1 - self.vres_fast_inertia)
+        # scaling_fast = gain_fast_cal / gain_fast_run
+        # self.vres_c_tan = kwargs.get("vres_c_tan") * scaling_fast
+
+        # gain_slow_cal = 1.0 / (1 - kwargs.get("vres_slow", 1))
+        # gain_slow_run = 1.0 / (1 - self.vres_slow_inertia)
+        # scaling_slow = gain_slow_cal / gain_slow_run
+        # self.vres_c_tan2 = kwargs.get("vres_c_tan2", 0) * scaling_slow
 
         self.gpp_c_half = kwargs.get("gpp_c_half", defaults.GPP_C_HALF)
         self.gpp_c_l = kwargs.get("gpp_c_l", defaults.GPP_C_L)
         self.gpp_t_e = kwargs.get("gpp_t_e", defaults.GPP_T_E)
         self.gpp_t_l = kwargs.get("gpp_t_l", defaults.GPP_T_L)
+        self.gpp_c_e = kwargs.get("gpp_c_e")
+        self.gpp_hyst = kwargs.get("gpp_hyst")
+
+        # inertia parameters
+        self.gpp_fast_inertia = kwargs.get("gpp_fast", 1) ** timestep
+        self.gpp_slow_inertia = kwargs.get("gpp_slow", 1) ** timestep
+        self.gpp_prev_fast_inertia = 0.0
+        self.gpp_prev_slow_inertia = 0.0
+
+        # gain_fast_cal = 1.0 / (1 - kwargs.get("gpp_fast", 1))
+        # gain_fast_run = 1.0 / (1 - self.gpp_fast_inertia)
+        # scaling_fast = gain_fast_cal / gain_fast_run
+        # self.gpp_c_tan = kwargs.get("gpp_c_tan") * scaling_fast
+
+        # gain_slow_cal = 1.0 / (1 - kwargs.get("gpp_slow", 1))
+        # gain_slow_run = 1.0 / (1 - self.gpp_slow_inertia)
+        # scaling_slow = gain_slow_cal / gain_slow_run
+        # self.gpp_c_tan2 = kwargs.get("gpp_c_tan2", 0) * scaling_slow
+
+        self.gpp_c_tan = kwargs.get("gpp_c_tan")
+        self.gpp_c_tan2 = kwargs.get("gpp_c_tan2", 0)
 
         self.npp_c_half = kwargs.get("npp_c_half", defaults.NPP_C_HALF)
         self.npp_c_l = kwargs.get("npp_c_l", defaults.NPP_C_L)
         self.npp_t_e = kwargs.get("npp_t_e", defaults.NPP_T_E)
         self.npp_t_l = kwargs.get("npp_t_l", defaults.NPP_T_L)
+        self.npp_c_e = kwargs.get("npp_c_e")
+        self.npp_hyst = kwargs.get("npp_hyst")
+
+        # inertia parameters
+        self.npp_fast_inertia = kwargs.get("npp_fast", 1) ** timestep
+        self.npp_slow_inertia = kwargs.get("npp_slow", 1) ** timestep
+        self.npp_prev_fast_inertia = 0.0
+        self.npp_prev_slow_inertia = 0.0
+
+        self.npp_c_tan = kwargs.get("npp_c_tan")
+        self.npp_c_tan2 = kwargs.get("npp_c_tan2", 0)
+
+        # gain_fast_cal = 1.0 / (1 - kwargs.get("npp_fast", 1))
+        # gain_fast_run = 1.0 / (1 - self.npp_fast_inertia)
+        # scaling_fast = gain_fast_cal / gain_fast_run
+        # self.npp_c_tan = kwargs.get("npp_c_tan") * scaling_fast
+
+        # gain_slow_cal = 1.0 / (1 - kwargs.get("npp_slow", 1))
+        # gain_slow_run = 1.0 / (1 - self.npp_slow_inertia)
+        # scaling_slow = gain_slow_cal / gain_slow_run
+        # self.npp_c_tan2 = kwargs.get("npp_c_tan2", 0) * scaling_slow
 
         self.lit_c_half = kwargs.get("lit_c_half", defaults.LIT_C_HALF)
         self.lit_c_l = kwargs.get("lit_c_l", defaults.LIT_C_L)
         self.lit_t_e = kwargs.get("lit_t_e", defaults.LIT_T_E)
         self.lit_t_l = kwargs.get("lit_t_l", defaults.LIT_T_L)
+        self.lit_c_e = kwargs.get("lit_c_e")
+        self.lit_hyst = kwargs.get("lit_hyst")
 
-    def get_vres(self, temp_ano, catm):
+        # inertia parameters
+        self.lit_fast_inertia = kwargs.get("lit_fast", 1) ** timestep
+        self.lit_slow_inertia = kwargs.get("lit_slow", 1) ** timestep
+        self.lit_prev_fast_inertia = 0.0
+        self.lit_prev_slow_inertia = 0.0
+
+        self.lit_c_tan = kwargs.get("lit_c_tan")
+        self.lit_c_tan2 = kwargs.get("lit_c_tan2", 0)
+
+        # gain_fast_cal = 1.0 / (1 - kwargs.get("lit_fast", 1))
+        # gain_fast_run = 1.0 / (1 - self.lit_fast_inertia)
+        # scaling_fast = gain_fast_cal / gain_fast_run
+        # self.lit_c_tan = kwargs.get("lit_c_tan") * scaling_fast
+
+        # gain_slow_cal = 1.0 / (1 - kwargs.get("lit_slow", 1))
+        # gain_slow_run = 1.0 / (1 - self.lit_slow_inertia)
+        # scaling_slow = gain_slow_cal / gain_slow_run
+        # self.lit_c_tan2 = kwargs.get("lit_c_tan2", 0) * scaling_slow
+
+    def get_vres(self, temp_ano, catm, hyst_signal_t):
         """
         Vegetation respiration coefficient. It should be multiplied by the vegetation
         carbon content to obtain the total vegetation respiration flux.
@@ -60,7 +146,25 @@ class VegetationBox(AbstractLandBox):
         input:
         - temp_ano: temperature anomaly from pre-industrial (kelvin/celsius).
         - catm: atmospheric concentration of carbon dioxide (ppm).
+        - hyst_signal_t: difference between current temperature anomaly and highest
+                         temperature anomaly experienced by the model thus far
+                         (kelvin/celsius).
         """
+
+        self.vres_prev_fast_inertia = (
+            self.vres_fast_inertia * self.vres_prev_fast_inertia
+            + (1 - self.vres_fast_inertia) * temp_ano
+        )
+        self.vres_prev_slow_inertia = (
+            self.vres_slow_inertia * self.vres_prev_slow_inertia
+            + (1 - self.vres_slow_inertia) * temp_ano
+        )
+
+        f_inertia = (
+            1.0
+            + self.vres_c_tan * self.vres_prev_fast_inertia
+            + self.vres_c_tan2 * self.vres_prev_slow_inertia
+        )
 
         return general_calibration_fun(
             self.vres0_par,
@@ -68,21 +172,47 @@ class VegetationBox(AbstractLandBox):
             self.vres_t_e,
             self.vres_c_l,
             self.vres_c_half,
-            self.stock,
+            self.vres_c_e,
+            self.vres_hyst,
+            None,
+            None,
+            None,
+            None,
+            self.stock - self.stock0,
             self.stock0,
             self.catm0,
             temp_ano,
             catm,
+            hyst_signal=hyst_signal_t,
+            f_inertia_factor=f_inertia,
         )
 
-    def get_gpp(self, temp_ano, catm):
+    def get_gpp(self, temp_ano, catm, hyst_signal_t):
         """
         Gross primary production.
 
         input:
         - temp_ano: temperature anomaly from pre-industrial (kelvin/celsius).
         - catm: atmospheric concentration of carbon dioxide (ppm).
+        - hyst_signal_t: difference between current temperature anomaly and highest
+                         temperature anomaly experienced by the model thus far
+                         (kelvin/celsius).
         """
+
+        self.gpp_prev_fast_inertia = (
+            self.gpp_fast_inertia * self.gpp_prev_fast_inertia
+            + (1 - self.gpp_fast_inertia) * temp_ano
+        )
+        self.gpp_prev_slow_inertia = (
+            self.gpp_slow_inertia * self.gpp_prev_slow_inertia
+            + (1 - self.gpp_slow_inertia) * temp_ano
+        )
+
+        f_inertia = (
+            1.0
+            + self.gpp_c_tan * self.gpp_prev_fast_inertia
+            + self.gpp_c_tan2 * self.gpp_prev_slow_inertia
+        )
 
         return general_calibration_fun(
             self.gpp0_par,
@@ -90,21 +220,47 @@ class VegetationBox(AbstractLandBox):
             self.gpp_t_e,
             self.gpp_c_l,
             self.gpp_c_half,
-            self.stock,
+            self.gpp_c_e,
+            self.gpp_hyst,
+            None,
+            None,
+            None,
+            None,
+            self.stock - self.stock0,
             self.stock0,
             self.catm0,
             temp_ano,
             catm,
+            hyst_signal=hyst_signal_t,
+            f_inertia_factor=f_inertia,
         )
 
-    def get_npp(self, temp_ano, catm):
+    def get_npp(self, temp_ano, catm, hyst_signal_t):
         """
         Net primary production. In theory, this should be equal to GPP - vres.
 
         input:
         - temp_ano: temperature anomaly from pre-industrial (kelvin/celsius).
         - catm: atmospheric concentration of carbon dioxide (ppm).
+        - hyst_signal_t: difference between current temperature anomaly and highest
+                         temperature anomaly experienced by the model thus far
+                         (kelvin/celsius).
         """
+
+        self.npp_prev_fast_inertia = (
+            self.npp_fast_inertia * self.npp_prev_fast_inertia
+            + (1 - self.npp_fast_inertia) * temp_ano
+        )
+        self.npp_prev_slow_inertia = (
+            self.npp_slow_inertia * self.npp_prev_slow_inertia
+            + (1 - self.npp_slow_inertia) * temp_ano
+        )
+
+        f_inertia = (
+            1.0
+            + self.npp_c_tan * self.npp_prev_fast_inertia
+            + self.npp_c_tan2 * self.npp_prev_slow_inertia
+        )
 
         return general_calibration_fun(
             self.npp0_par,
@@ -112,14 +268,22 @@ class VegetationBox(AbstractLandBox):
             self.npp_t_e,
             self.npp_c_l,
             self.npp_c_half,
-            self.stock,
+            self.npp_c_e,
+            self.npp_hyst,
+            None,
+            None,
+            None,
+            None,
+            self.stock - self.stock0,
             self.stock0,
             self.catm0,
             temp_ano,
             catm,
+            hyst_signal=hyst_signal_t,
+            f_inertia_factor=f_inertia,
         )
 
-    def get_litterfall(self, temp_ano, catm):
+    def get_litterfall(self, temp_ano, catm, hyst_signal_t):
         """
         Litterfall coefficient. It should be multiplied by the vegetation carbon content
         to obtain the total litterfall flux.
@@ -127,7 +291,25 @@ class VegetationBox(AbstractLandBox):
         input:
         - temp_ano: temperature anomaly from pre-industrial (kelvin/celsius).
         - catm: atmospheric concentration of carbon dioxide (ppm).
+        - hyst_signal_t: difference between current temperature anomaly and highest
+                         temperature anomaly experienced by the model thus far
+                         (kelvin/celsius).
         """
+
+        self.lit_prev_fast_inertia = (
+            self.lit_fast_inertia * self.lit_prev_fast_inertia
+            + (1 - self.lit_fast_inertia) * temp_ano
+        )
+        self.lit_prev_slow_inertia = (
+            self.lit_slow_inertia * self.lit_prev_slow_inertia
+            + (1 - self.lit_slow_inertia) * temp_ano
+        )
+
+        f_inertia = (
+            1.0
+            + self.lit_c_tan * self.lit_prev_fast_inertia
+            + self.lit_c_tan2 * self.lit_prev_slow_inertia
+        )
 
         return general_calibration_fun(
             self.lit0_par,
@@ -135,9 +317,17 @@ class VegetationBox(AbstractLandBox):
             self.lit_t_e,
             self.lit_c_l,
             self.lit_c_half,
-            self.stock,
+            self.lit_c_e,
+            self.lit_hyst,
+            None,
+            None,
+            None,
+            None,
+            self.stock - self.stock0,
             self.stock0,
             self.catm0,
             temp_ano,
             catm,
+            hyst_signal=hyst_signal_t,
+            f_inertia_factor=f_inertia,
         )

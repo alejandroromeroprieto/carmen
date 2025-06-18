@@ -145,13 +145,13 @@ class OceanCarbonCycle:
         # TODO: this is here for the archive, but delete for clean version of model
         # Modulation of the mixed layer depth.
         # I tested many different functional dependence here for this modulation:
-        # docntemp = self.docn * (
-        #     1.0
-        #     + np.maximum(
-        #         -0.5,
-        #         np.minimum(1.0, self.docnfac * (np.exp(self.docntemp * dt_ocn) - 1)),
-        #     )
-        # )
+        docntemp = self.docn * (
+            1.0
+            + np.maximum(
+                -0.5,
+                np.minimum(1.0, (np.exp(self.docntemp * dt_ocn) - 1)),
+            )
+        )
         # docntemp = self.docn * np.maximum(0.5, np.minimum(2, (1 + self.docnfac * dt_ocn) * np.exp(self.docntemp * dt_ocn)))
         # docntemp = self.docn * np.maximum(0.5, np.minimum(2, self.docnfac * np.exp(self.docntemp * dt_ocn)))
         # docntemp = self.docn * np.maximum(0.5, np.minimum(2, self.docnfac * np.exp(self.docntemp * dt_ocn)))
@@ -169,7 +169,25 @@ class OceanCarbonCycle:
         # For context: OSCAR does the following:
         # d_0*par*e^(par*T))  (Eq__D_mld in link below) but this explodes for large Ts
         # https://github.com/tgasser/OSCAR/blob/master/core_fct/mod_process.py
-        docntemp = self.docn * (1 / (1 + np.exp(self.docntemp * dt_ocn)) + 0.5)
+        # docntemp = self.docn * (1 / (1 + np.exp(self.docntemp * dt_ocn)) + 0.5)
+        # The above option seemed to have worst outcomes
+        # temp = self.docnfac * (np.exp(self.docntemp * dt_ocn) - 1)
+        # temp_abs = self.docnfac * (np.exp(np.abs(self.docntemp * dt_ocn)) - 1)
+        # docntemp = self.docn * (
+        #     1 - temp/(1+temp_abs)
+        # )
+        # docntemp = self.docn * (
+        #     1.0
+        #     + np.maximum(
+        #         -0.5,
+        #         np.minimum(1.0, self.docnfac * dt_ocn))),
+        # docntemp = self.docn * (
+        #     1.0
+        #     + np.maximum(
+        #         -0.5,
+        #         np.minimum(1.0, (np.exp(self.docntemp * dt_ocn) - 1)),
+        #     )
+        # ) # 3.163281781484243
         # TODO: self.docnfac is not needed anymore
 
         cmol = mol_units_converter / docntemp

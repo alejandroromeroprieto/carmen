@@ -367,9 +367,11 @@ def load_esm_data(
         gcm_fcvegoutcsoilin = None
 
     # Calculate temperature anomalies of surface and ocean againt the baseline defined
-    # by the number of initial datapoints supplied in ninit
-    dtglb = gcm_tglb - np.mean(gcm_tglb[:ninit])
-    dtlnd = gcm_tlnd - np.mean(gcm_tlnd[:ninit])
+    # by the initial temperature in the smoothed temperature data
+    gcm_tglb_smoothed = apply_smoothing(esm_data["tas"] - KELVIN_0, {"type": "butterworth", "pars": [20]})
+    gcm_tdtlnd_smoothed = apply_smoothing(esm_data["tas_land"] - KELVIN_0, {"type": "butterworth", "pars": [20]})
+    dtglb = gcm_tglb - gcm_tglb_smoothed[0]
+    dtlnd = gcm_tlnd - gcm_tdtlnd_smoothed[0]
 
     # Derive the global mean near surface ocean temperature, given the means from the
     # total and land.

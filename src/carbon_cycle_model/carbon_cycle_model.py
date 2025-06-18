@@ -4,6 +4,7 @@ file also implements a call to the cli_parser class to enable running the class 
 the cli.
 """
 
+import os
 from pathlib import Path
 import time as systime
 
@@ -11,12 +12,13 @@ import json
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import xarray as xr
 
 from carbon_cycle_model.cli_parser import cli_parser
 from carbon_cycle_model.land_component.land_component import LandCarbonCycle
 from carbon_cycle_model.ocean_component.ocean_component import OceanCarbonCycle
-from carbon_cycle_model.utils import Data, load_esm_data
-from carbon_cycle_model.constants import PPM2GT, PARS_DIR, SCEN_DIR
+from carbon_cycle_model.utils import Data, load_esm_data, make_all_dirs
+from carbon_cycle_model.constants import PPM2GT, PARS_DIR, SCEN_DIR, OUTPUT_DIR
 from carbon_cycle_model import defaults
 
 
@@ -69,7 +71,7 @@ class CarbonCycle:
                 # points to denoise the first value. However, if dealing with a
                 # 1pctco2(-cdr) just take the first value, as subsequent values will
                 # already have significantly diverged from equilibrium.
-                if scenario in ["1pctco2", "1pctco2-cdr"]:
+                if scenario in ["1pctco2", "1pctco2-cdr", "flat10"]:
                     ninit_scenario = 1
                 else:
                     ninit_scenario = 20
@@ -192,9 +194,14 @@ class CarbonCycle:
             endpoint=True,
         )
 
+        # emis_i = np.interp(time_i, self.esm_data.time, [10]*len(self.esm_data.time))
         emis_i = np.interp(time_i, self.esm_data.time, self.esm_data.emis)
         dtocn_i = np.interp(time_i, self.esm_data.time, self.esm_data.dtocn)
         dtglb_i = np.interp(time_i, self.esm_data.time, self.esm_data.dtglb)
+        cveg_i = np.interp(time_i, self.esm_data.time, self.esm_data.cveg)
+        csoil_i = np.interp(time_i, self.esm_data.time, self.esm_data.csoil)
+        ctam_i = np.interp(time_i, self.esm_data.time, self.esm_data.catm)
+        cocean_i = np.interp(time_i, self.esm_data.time, self.esm_data.oflux)
 
         # Some quantities may or not be present. If they are not present
         # fill with zeros. These quantities are:
@@ -242,7 +249,11 @@ class CarbonCycle:
                 fcva=fcva_i[i],
                 fcsa=fcsa_i[i],
                 fcvs=fcvs_i[i],
+                cveg_esm=cveg_i[i],
+                csoil_esm=csoil_i[i],
+                catm_esm=ctam_i[i]
             )
+
             del_lnd = delta_cveg + delta_csoil
 
             # del_lnd is the difference in carbon in veg and soil
@@ -260,6 +271,7 @@ class CarbonCycle:
                 self.catm[i],
                 dtocn_i[i + 1],
             )
+            # delta_ocn = cocean_i[i]
 
             self.catm[i + 1] = self.catm[i] + (dt_ems - delta_ocn - del_lnd) / PPM2GT
             self.emis[i + 1] = emis_i[i]
@@ -622,6 +634,70 @@ class CarbonCycle:
         self.time = new_time
 
 
+    def store_results(self, model, scenario, scc_pars, out_file):
+        data_vars = {
+            # Atmospheric CO2
+            'esm_catm': ('time', self.esm_data.catm),
+            'simulated_catm': ('time', self.catm),
+            
+            # Land box variables
+            'esm_cveg': ('time', self.esm_data.cveg),
+            'simulated_cveg': ('time', self.land.cveg),
+            
+            'esm_csoil': ('time', self.esm_data.csoil),
+            'simulated_csoil': ('time', self.land.csoil),
+            
+            'esm_npp': ('time', self.esm_data.npp),
+            'simulated_npp': ('time', self.land.npp),
+            
+            'esm_lit': ('time', self.esm_data.lit),
+            'simulated_lit': ('time', self.land.lit),
+            
+            'esm_sres': ('time', self.esm_data.rh),
+            'simulated_sres': ('time', self.land.sres),
+            
+            'esm_fcva': ('time', self.land.fcva),
+            
+            'esm_fcsa': ('time', self.land.fcsa),
+            
+            'esm_fcvs': ('time', self.land.fcvs),
+            
+            # Ocean box
+            'esm_ocean_carbon_uptake': ('time', np.cumsum(self.esm_data.oflux)),
+            'simulated_ocean_carbon_uptake': ('time', self.ocean.carbon_increase),
+            
+            'esm_oflux': ('time', self.esm_data.oflux),
+            'simulated_oflux': ('time', self.ocean.oflux),
+            
+            # General carbon cycle boxy
+            'esm_emissions': ('time', self.esm_data.gcmemis),
+            'simulated_emissions': ('time', self.emis,),
+        }
+        
+        # Conditionally add gpp and vres
+        if not self.npp_flag:
+            data_vars['esm_gpp'] = ('time', self.esm_data.gpp)
+            data_vars['simulated_gpp'] = ('time', self.land.gpp)
+            
+            data_vars['esm_vres'] = ('time', self.esm_data.ra)
+            data_vars['simulated_vres'] = ('time', self.land.vres)
+        
+        # Create Dataset
+        ds = xr.Dataset(
+            data_vars,
+            coords={
+                'time': self.time
+            }
+        )
+
+        # Add global metadata
+        ds.attrs['model'] = model
+        ds.attrs['scenario'] = scenario
+        ds.attrs['model_pars'] = json.dumps(scc_pars)
+
+        ds.to_netcdf(out_file)
+
+
 def main():
     """ "
     Enable the execution of the carbon cycle emulator through the use of the CLI.
@@ -647,7 +723,7 @@ def main():
     recalc_emis = True
 
     # Run the cli parser and retrieve the required information
-    models, scenario, scenario_pars, realisation, _, npp_flag = cli_parser()
+    models, scenario, scenario_pars, realisation, _, npp_flag, store_flag = cli_parser()
 
     # Run emulation for each model
     for model in models:
@@ -655,17 +731,31 @@ def main():
         # points to denoise the first value. However, if dealing with a
         # 1pctco2(-cdr) just take the first value, as subsequent values will
         # already have significantly diverged from equilibrium.
-        if scenario in ["1pctco2", "1pctco2-cdr"]:
-            ninit_scenario = 1
-        elif "abrupt" in scenario:
-            ninit_scenario = 1
+        # How to derive pre-industrial values
+        if model in ["BCC-CSM2-MR", "CESM2", "GFDL-ESM4", "IPSL-CM6A-LR", "MIROC-ES2L", "MPI-ESM1-2-LR", "MRI-ESM2-0", "NorESM2-LM", "UKESM1-0-LL"]:
+            if "1pctco2" in scenario:
+                PRE_IND_AVERAGE_LENGTH = 1
+            elif "ssp" in scenario or "hist" in scenario:
+                PRE_IND_AVERAGE_LENGTH = 20
+            elif "abrupt" in scenario:
+                PRE_IND_AVERAGE_LENGTH = 1
+            elif "flat" in scenario:
+                PRE_IND_AVERAGE_LENGTH = 1
+            else:
+                raise ValueError(f"Experiment {scenario} not recognised")
+
+            pre_ind_algorithm = {"type": "average", "length": PRE_IND_AVERAGE_LENGTH}
+
+        elif model in ["ACCESS-ESM1-5", "CanESM5", "CMCC-ESM2", "CNRM-ESM2-1"]:
+            pre_ind_algorithm = {"type": "butterworth", "length": [10]}
+
         else:
-            ninit_scenario = 20
+            raise ValueError(f"Model {model} not recognised")
 
         # Load diagnosed ESM data from the data dir
         if model == "CNRM-ESM2-1" or model == "IPSL-CM6A-LR":
             scen_to_use = SCEN_DIR + "/detrended_wrt_decade"
-            pars_to_use = PARS_DIR + "/detrended_wrt_decade"
+            pars_to_use = PARS_DIR
         else:
             scen_to_use = SCEN_DIR
             pars_to_use = PARS_DIR
@@ -687,7 +777,6 @@ def main():
         esm_data = load_esm_data(
             data_file,
             recalc_emis=recalc_emis,
-            ninit=ninit_scenario,
             smoothing_pars=smoothing_algorithm,
         )
 
@@ -709,11 +798,28 @@ def main():
         scc_pars["cveg0"] = esm_data.cveg[0]
         scc_pars["csoil0"] = esm_data.csoil[0]
         scc_pars["catm0"] = esm_data.catm[0]
-        scc_pars["npp0"] = np.mean(esm_data.npp[0:ninit_scenario])
-        scc_pars["gpp0"] = np.mean(esm_data.gpp[0:ninit_scenario])
-        scc_pars["lit0"] = np.mean(esm_data.lit[0:ninit_scenario])
-        scc_pars["sres0"] = np.mean(esm_data.rh[0:ninit_scenario])
-        scc_pars["vres0"] = np.mean(esm_data.ra[0:ninit_scenario])
+
+        if pre_ind_algorithm["type"] == "average":
+            scc_pars["npp0"] = np.mean(esm_data.npp[0:pre_ind_algorithm["length"]])
+            scc_pars["gpp0"] = np.mean(esm_data.gpp[0:pre_ind_algorithm["length"]])
+            scc_pars["lit0"] = np.mean(esm_data.lit[0:pre_ind_algorithm["length"]])
+            scc_pars["sres0"] = np.mean(esm_data.rh[0:pre_ind_algorithm["length"]])
+            scc_pars["vres0"] = np.mean(esm_data.ra[0:pre_ind_algorithm["length"]])
+        elif pre_ind_algorithm["type"] == "butterworth":
+            # # Independetely from how we smooth the data to be used, make sure the initial values
+            # # for fluxes are determined from the smoothed data to avoid effects from unusally
+            # # high/low flux values from the ESM
+            esm_input_smoothed = load_esm_data(
+                data_file, recalc_emis, smoothing_pars={"type": "butterworth", "pars": [10]}
+            )
+
+            scc_pars["npp0"] = esm_input_smoothed.npp[0]
+            scc_pars["gpp0"] = esm_input_smoothed.gpp[0]
+            scc_pars["lit0"] = esm_input_smoothed.lit[0]
+            scc_pars["sres0"] = esm_input_smoothed.rh[0]
+            scc_pars["vres0"] = esm_input_smoothed.ra[0]
+        else:
+            raise ValueError(f"Pre-industrial algorithm {pre_ind_algorithm["type"]} not recognised.")
 
         # Measure the time it takes us to run the model
         tbeg = systime.time()
@@ -729,6 +835,15 @@ def main():
         print("Time to process:", tend - tbeg)
 
         cc_emulator.create_plots(model)
+
+        # Store results
+        if store_flag:
+            CWD = str(Path.cwd())
+            out_file = os.path.join(CWD, OUTPUT_DIR)
+            out_file += f"/simulation_{model}_{scenario}.nc"
+            make_all_dirs(out_file)
+
+            cc_emulator.store_results(model, scenario, scc_pars, out_file)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ from carbon_cycle_model import defaults
 class SoilBox(AbstractLandBox):
     """Soil box class."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, num_steps, timestep, **kwargs):
         super().__init__(kwargs.get("csoil0", defaults.CSOIL0_DEFAULT))
         self.catm0 = kwargs.get("catm0", defaults.CATM0_DEFAULT)
         self.sres0 = kwargs.get("sres0", defaults.SRES0_DEFAULT)
@@ -24,8 +24,34 @@ class SoilBox(AbstractLandBox):
         self.sres_c_l = kwargs.get("sres_c_l", defaults.SRES_C_L)
         self.sres_t_e = kwargs.get("sres_t_e", defaults.SRES_T_E)
         self.sres_t_l = kwargs.get("sres_t_l", defaults.SRES_T_L)
+        self.sres_c_e = kwargs.get("sres_c_e")
+        self.sres_hyst = kwargs.get("sres_hyst")
 
-    def get_sres(self, temp_ano, catm):
+        # inertia parameters
+        self.sres_fast_inertia = kwargs.get("sres_fast", 1) ** timestep
+        self.sres_slow_inertia = kwargs.get("sres_slow", 1) ** timestep
+        self.sres_prev_fast_inertia = 0.0
+        self.sres_prev_slow_inertia = 0.0
+
+        # gain_fast_cal = 1.0 / (1 - kwargs.get("sres_fast", 1))
+        # gain_fast_run = 1.0 / (1 - self.sres_fast_inertia)
+        # scaling_fast = gain_fast_cal / gain_fast_run
+        # self.sres_c_tan = kwargs.get("sres_c_tan") * scaling_fast
+
+        self.sres_c_tan = kwargs.get("sres_c_tan")
+        self.sres_c_tan2 = kwargs.get("sres_c_tan2", 0)
+
+        # if self.sres_slow_inertia == 1:
+        #     gain_slow_cal = 1.0  # no inertia effect
+        #     gain_slow_run = 1.0
+        # else:
+        #     gain_slow_cal = 1.0 / (1 - kwargs.get("sres_slow", 1))
+        #     gain_slow_run = 1.0 / (1 - self.sres_slow_inertia)
+        # scaling_slow = gain_slow_cal / gain_slow_run
+        # self.sres_c_tan2 = kwargs.get("sres_c_tan2", 0) * scaling_slow
+
+
+    def get_sres(self, temp_ano, catm, hyst_signal_t):
         """
         Soil respiration coefficient. It should be multiplied by the soil carbon content
         to obtain the total soil respiration flux.
@@ -33,7 +59,25 @@ class SoilBox(AbstractLandBox):
         input:
         - temp_ano: temperature anomaly from pre-industrial (kelvin/celsius).
         - catm: atmospheric concentration of carbon dioxide (ppm).
+        - hyst_signal_t: difference between current temperature anomaly and highest
+                         temperature anomaly experienced by the model thus far
+                         (kelvin/celsius).
         """
+
+        self.sres_prev_fast_inertia = (
+            self.sres_fast_inertia * self.sres_prev_fast_inertia
+            + (1 - self.sres_fast_inertia) * temp_ano
+        )
+        self.sres_prev_slow_inertia = (
+            self.sres_slow_inertia * self.sres_prev_slow_inertia
+            + (1 - self.sres_slow_inertia) * temp_ano
+        )
+
+        f_inertia = (
+            1.0
+            + self.sres_c_tan * self.sres_prev_fast_inertia
+            + self.sres_c_tan2 * self.sres_prev_slow_inertia
+        )
 
         return general_calibration_fun(
             self.sres0_par,
@@ -41,9 +85,17 @@ class SoilBox(AbstractLandBox):
             self.sres_t_e,
             self.sres_c_l,
             self.sres_c_half,
-            self.stock,
+            self.sres_c_e,
+            self.sres_hyst,
+            None,
+            None,
+            None,
+            None,
+            self.stock - self.stock0,
             self.stock0,
             self.catm0,
             temp_ano,
             catm,
+            hyst_signal=hyst_signal_t,
+            f_inertia_factor=f_inertia,
         )

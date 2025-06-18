@@ -10,9 +10,10 @@ import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from optimparallel import minimize_parallel
 
+from carbon_cycle_model.carbon_cycle_model import CarbonCycle
 from carbon_cycle_model.land_component.boxes.utils import general_calibration_fun
 from carbon_cycle_model.ocean_component.ocean_component import OceanCarbonCycle
-from carbon_cycle_model.utils import butterworth, load_esm_data
+from carbon_cycle_model.utils import butterworth, load_esm_data, Data
 
 
 class Normalizer:
@@ -59,7 +60,7 @@ class Normalizer:
 
 
 def load_and_prepare_esm_data(
-    path, model, experiment, recalc_emis, ninit, smoothing_alg, realisation="default"
+    path, model, experiment, recalc_emis, ninit, smoothing_alg, realisation="default", data_output=False,
 ):
     """
     Load and prepare the ESM data for calibration.
@@ -79,6 +80,7 @@ def load_and_prepare_esm_data(
     - realisation: realisation of the ESM run. If supplied, the function will
                    attempt to load a name file with that string at the end of the
                    file name.
+    - data_output: whether the output should be in a Data object or a python dictionary.
 
     return: dictionary with loaded ESM data, under the appropriate model and
             scenario entries.
@@ -90,7 +92,7 @@ def load_and_prepare_esm_data(
     print("Loading file: ", file_path)
 
     esm_input = load_esm_data(
-        file_path, recalc_emis, ninit=ninit, smoothing_pars=smoothing_alg
+        file_path, recalc_emis, smoothing_pars=smoothing_alg
     )
 
     # Get initial figures for the relevant quantities for the model
@@ -99,51 +101,110 @@ def load_and_prepare_esm_data(
     cveg0 = esm_input.cveg[0]
     csoil0 = esm_input.csoil[0]
 
-    gpp0 = np.mean(esm_input.gpp[:ninit])
-    npp0 = np.mean(esm_input.npp[:ninit])
-    lit0 = np.mean(esm_input.lit[:ninit])
+    if ninit["type"] == "average":
+        ninit_length = ninit["length"]
+        gpp0 = np.mean(esm_input.gpp[:ninit_length])
+        npp0 = np.mean(esm_input.npp[:ninit_length])
+        lit0 = np.mean(esm_input.lit[:ninit_length])
 
-    catm0 = np.mean(esm_input.catm[:ninit])
-    lu0 = np.mean(esm_input.lu[:ninit])
+        catm0 = np.mean(esm_input.catm[:ninit_length])
+        lu0 = np.mean(esm_input.lu[:ninit_length])
 
-    sres0 = np.mean(esm_input.rh[:ninit])
-    vres0 = np.mean(esm_input.ra[:ninit])
+        sres0 = np.mean(esm_input.rh[:ninit_length])
+        vres0 = np.mean(esm_input.ra[:ninit_length])
+    elif ninit["type"] == "butterworth":
+        # Independetely from how we smooth the data to be used, make sure the initial values
+        # for fluxes are determined from the smoothed data to avoid effects from unusally
+        # high/low flux values from the ESM
+        # Used in calibration for:
+        # - CMCC
+        esm_input_smoothed = load_esm_data(
+            file_path, recalc_emis, smoothing_pars={"type": "butterworth", "pars": [10]}
+        )
+        gpp0 = esm_input_smoothed.gpp[0]
+        npp0 = esm_input_smoothed.npp[0]
+        lit0 = esm_input_smoothed.lit[0]
+
+        catm0 = esm_input_smoothed.catm[0]
+        lu0 = esm_input_smoothed.lu[0]
+
+        sres0 = esm_input_smoothed.rh[0]
+        vres0 = esm_input_smoothed.ra[0]
+
+    # print(lit0, cveg0)
 
     # Flux efficiency parameters
     vres0_par = vres0 / cveg0
     sres0_par = sres0 / csoil0
     lit0_par = lit0 / cveg0
 
-    loaded_data = {
-        "catm": esm_input.catm,
-        "csoil": esm_input.csoil,
-        "cveg": esm_input.cveg,
-        "dtglb": esm_input.dtglb,
-        "dtocn": esm_input.dtocn,
-        "emis": esm_input.emis,
-        "gpp": esm_input.gpp,
-        "lit": esm_input.lit,
-        "lu": esm_input.lu,
-        "npp": esm_input.npp,
-        "oflux": esm_input.oflux,
-        "ra": esm_input.ra,
-        "rh": esm_input.rh,
-        "time": esm_input.time,
-        "fcvegout": esm_input.fcvegout,
-        "fcsoilout": esm_input.fcsoilout,
-        "gpp0": gpp0,
-        "npp0": npp0,
-        "cveg0": cveg0,
-        "csoil0": csoil0,
-        "lit0": lit0,
-        "catm0": catm0,
-        "lu0": lu0,
-        "rh0": sres0,
-        "ra0": vres0,
-        "vres0": vres0_par,
-        "sres0": sres0_par,
-        "litp0": lit0_par,
-    }
+    if data_output:
+        loaded_data = Data(
+            catm = esm_input.catm,
+            csoil = esm_input.csoil,
+            cveg = esm_input.cveg,
+            dtglb = esm_input.dtglb,
+            dtocn = esm_input.dtocn,
+            emis = esm_input.emis,
+            gpp = esm_input.gpp,
+            lit = esm_input.lit,
+            lu = esm_input.lu,
+            npp = esm_input.npp,
+            oflux = esm_input.oflux,
+            ra = esm_input.ra,
+            rh = esm_input.rh,
+            time = esm_input.time,
+            initial_year = esm_input.time[0],
+            final_year = esm_input.time[-1],
+            fcvegout = esm_input.fcvegout,
+            fcsoilout = esm_input.fcsoilout,
+            fcvegoutcsoilin = esm_input.fcvegoutcsoilin,
+            gpp0 = gpp0,
+            npp0 = npp0,
+            cveg0 = cveg0,
+            csoil0 = csoil0,
+            lit0 = lit0,
+            catm0 = catm0,
+            lu0 = lu0,
+            rh0 = sres0,
+            ra0 = vres0,
+            vres0 = vres0_par,
+            sres0 = sres0_par,
+            litp0 = lit0_par,
+        )
+    else:
+        loaded_data = {
+            "catm": esm_input.catm,
+            "csoil": esm_input.csoil,
+            "cveg": esm_input.cveg,
+            "dtglb": esm_input.dtglb,
+            "dtocn": esm_input.dtocn,
+            "emis": esm_input.emis,
+            "gpp": esm_input.gpp,
+            "lit": esm_input.lit,
+            "lu": esm_input.lu,
+            "npp": esm_input.npp,
+            "oflux": esm_input.oflux,
+            "ra": esm_input.ra,
+            "rh": esm_input.rh,
+            "time": esm_input.time,
+            "initial_year": esm_input.time[0],
+            "final_year": esm_input.time[-1],
+            "fcvegout": esm_input.fcvegout,
+            "fcsoilout": esm_input.fcsoilout,
+            "gpp0": gpp0,
+            "npp0": npp0,
+            "cveg0": cveg0,
+            "csoil0": csoil0,
+            "lit0": lit0,
+            "catm0": catm0,
+            "lu0": lu0,
+            "rh0": sres0,
+            "ra0": vres0,
+            "vres0": vres0_par,
+            "sres0": sres0_par,
+            "litp0": lit0_par,
+        }
     return {model: {realisation: {experiment: loaded_data}}}
 
 
@@ -321,6 +382,213 @@ def hi_freq_variance(x, cutoff=30):
     return np.var(high_f_comp, ddof=1)
 
 
+def calculate_cost_whole_scc_cross_experiment(
+    param,
+    normalizer,
+    esm_data,
+    model,
+):
+    """
+    Calculate the "cost" of running the whole scc for the associated parameters as
+    compared to the reference (ESM) data across all experiments for a given model.
+
+    This "cost" is essentially a measure of how close our model simulation
+    is to the original ESM flux timseries.
+
+    input:
+    - param: parameters to define the instance of the model to calculate the cost of.
+    - normaliser: normaliser object to translate par values from dimenional to
+                  normalised and vice versa.
+    - esm_data: dictionary containing the esm data for the specific model.
+    - model: model to use for input to the cost calculation. Essentially, the model
+             we are calibrating against.
+
+    return: total cost across experiments.
+    """
+    cost = 0
+    for realisation in esm_data[model].keys():
+        for experiment in esm_data[model][realisation].keys():
+            cost += cost_whole_scc(
+                model,
+                param,
+                normalizer,
+                esm_data[model][realisation][experiment],
+            )
+    return np.log(cost)
+
+
+def cost_whole_scc(model, param, normalizer, esm_data_experiment):
+    """
+    Calculate the "cost" of running the whole scc for the associated parameters as
+    compared to the reference (ESM) data for a given experiment and model.
+
+    This "cost" is essentially a measure of how close our model simulation
+    is to the original ESM flux timseries.
+
+    input:
+    - model: name of the ESM model comparing to.
+    - param: parameters to define the instance of the model to calculate the cost of.
+    - normaliser: normaliser object to translate par values from dimenional to
+                  normalised and vice versa.
+    - esm_data_experiment: dictionary containing the esm data for the specific model and
+                           experiment.
+
+    return: total cost across experiments.
+    """
+    DT_MODEL = 1/8
+    DT_MODEL_OCEAN = 1/8
+    ROUND_DECIMAL = 8
+    gpp_t_l, gpp_t_e, gpp_c_l, gpp_c_half, gpp_c_e, gpp_hyst, gpp_c_tan, gpp_fast, gpp_slow, gpp_c_tan2, lit_t_l, lit_t_e, lit_c_l, lit_c_half, lit_c_e, lit_hyst, lit_c_tan, lit_fast, lit_slow, lit_c_tan2, vres_t_l, vres_t_e, vres_c_l, vres_c_half, vres_c_e, vres_hyst, vres_c_tan, vres_fast, vres_slow, vres_c_tan2, sres_t_l, sres_t_e, sres_c_l, sres_c_half, sres_c_e, sres_hyst, sres_c_tan, sres_fast, sres_slow, sres_c_tan2, npp_t_l, npp_t_e, npp_c_l, npp_c_half, npp_c_e, npp_hyst, npp_c_tan, npp_fast, npp_slow, npp_c_tan2, docn, docnfac, ocntemp, docntemp = normalizer.inv(param)
+
+    scc_params = {
+        # If this is specified we use the new GPP model, rather than Glen#'s
+        'gpp_t_l'    : gpp_t_l,
+        'gpp_t_e'    : gpp_t_e,
+        'gpp_c_l'     : gpp_c_l,
+        'gpp_c_half' : gpp_c_half,
+        'gpp_c_e' : gpp_c_e,
+        'gpp_hyst' : gpp_hyst,
+        'gpp_c_tan' : gpp_c_tan,
+        'gpp_fast' : gpp_fast,
+        'gpp_slow' : gpp_slow,
+        'gpp_c_tan2' : gpp_c_tan2,
+
+        'lit_t_l'    : lit_t_l,
+        'lit_t_e'    : lit_t_e,
+        'lit_c_l'     : lit_c_l,
+        'lit_c_half' : lit_c_half,
+        'lit_c_e' : lit_c_e,
+        'lit_hyst' : lit_hyst,
+        'lit_c_tan' : lit_c_tan,
+        'lit_fast' : lit_fast,
+        'lit_slow' : lit_slow,
+        'lit_c_tan2' : lit_c_tan2,
+
+        'vres_t_l'    : vres_t_l,
+        'vres_t_e'    : vres_t_e,
+        'vres_c_l'     : vres_c_l,
+        'vres_c_half' : vres_c_half,
+        'vres_c_e' : vres_c_e,
+        'vres_hyst' : vres_hyst,
+        'vres_c_tan' : vres_c_tan,
+        'vres_fast' : vres_fast,
+        'vres_slow' : vres_slow,
+        'vres_c_tan2' : vres_c_tan2,
+
+        'sres_t_l'    : sres_t_l,
+        'sres_t_e'    : sres_t_e,
+        'sres_c_l'     : sres_c_l,
+        'sres_c_half' : sres_c_half,
+        'sres_c_e' : sres_c_e,
+        'sres_hyst' : sres_hyst,
+        'sres_c_tan' : sres_c_tan,
+        'sres_fast' : sres_fast,
+        'sres_slow' : sres_slow,
+        'sres_c_tan2' : sres_c_tan2,
+
+        'npp_t_l'    : npp_t_l,
+        'npp_t_e'    : npp_t_e,
+        'npp_c_l'     : npp_c_l,
+        'npp_c_half' : npp_c_half,
+        'npp_c_e' : npp_c_e,
+        'npp_hyst' : npp_hyst,
+        'npp_c_tan' : npp_c_tan,
+        'npp_fast' : npp_fast,
+        'npp_slow' : npp_slow,
+        'npp_c_tan2' : npp_c_tan2,
+
+        'docn'        : docn,
+        'docnfac'     : docnfac,
+        'ocntemp'     : ocntemp,
+        'docntemp'    : docntemp,
+
+        'model'  : model,
+        'cveg0'  : round(esm_data_experiment.cveg0, ROUND_DECIMAL),
+        'csoil0' : round(esm_data_experiment.csoil0, ROUND_DECIMAL),
+        'catm0'  : round(esm_data_experiment.catm0, ROUND_DECIMAL),
+        'npp0'   : round(esm_data_experiment.npp0, ROUND_DECIMAL),     
+        'gpp0'   : round(esm_data_experiment.gpp0, ROUND_DECIMAL),     
+        'lu0'    : round(esm_data_experiment.lu0, ROUND_DECIMAL),    
+        'lit0'   : round(esm_data_experiment.lit0, ROUND_DECIMAL),
+        'rh0'    : round(esm_data_experiment.rh0, ROUND_DECIMAL),
+        'ra0'    : round(esm_data_experiment.ra0, ROUND_DECIMAL),
+    }
+
+    cc_emulator = CarbonCycle(
+        esm_data_experiment,
+        DT_MODEL,
+        DT_MODEL_OCEAN,
+        npp_flag=False,
+        **scc_params,
+    )
+    cc_emulator.run_full_simulation()
+
+    # Interpolate back to ESM time points, so we can compare results
+    cc_emulator.interpolate_results(esm_data_experiment.time)
+
+    cost = 0
+    # cost1 = calculate_cost(esm_data_experiment.gpp, cc_emulator.land.gpp)
+    # cost2 = calculate_cost(esm_data_experiment.lit, cc_emulator.land.lit)
+    # cost3 = calculate_cost(esm_data_experiment.ra, cc_emulator.land.vres)
+    # cost4 = calculate_cost(esm_data_experiment.rh, cc_emulator.land.sres)
+    # # cost += calculate_cost(esm_data_experiment.npp, cc_emulator.land.npp)
+    # # cost += calculate_cost(esm_data_experiment.oflux, cc_emulator.ocean.oflux)
+    # # # cost +=  calculate_cost(esm_data.npp, scc_out.npp)
+
+    # cost5 = calculate_cost(esm_data_experiment.cveg, cc_emulator.land.cveg)
+    # cost6 = calculate_cost(esm_data_experiment.csoil, cc_emulator.land.csoil)
+    # cost7 = calculate_cost(esm_data_experiment.catm, cc_emulator.catm)
+    # # cum_oflux = np.cumsum(esm_data_experiment.oflux)
+    # # cost += calculate_cost(cum_oflux, cc_emulator.ocean.carbon_increase)
+    # print(cost1, cost2, cost3, cost4, cost5, cost6, cost7)
+    # cost = cost1 + cost2 +  cost3 + cost4 + cost5 + cost6 + cost7
+
+    weights = {
+        'gpp': 1.0,
+        'lit': 1.0,
+        'ra': 1.0,
+        'rh': 1.0,
+        'npp': 1.0,
+        'oflux': 1.0,
+        'cveg': 20.0,   # stocks weighted more
+        'csoil': 20.0,
+        'catm': 20.0,
+        'oflux': 10.0,
+    }
+
+    cost = (
+        weights['gpp'] * calculate_cost(esm_data_experiment.gpp, cc_emulator.land.gpp) +
+        weights['lit'] * calculate_cost(esm_data_experiment.lit, cc_emulator.land.lit) +
+        weights['ra'] * calculate_cost(esm_data_experiment.ra, cc_emulator.land.vres) +
+        weights['rh'] * calculate_cost(esm_data_experiment.rh, cc_emulator.land.sres) +
+        weights['npp'] * calculate_cost(esm_data_experiment.npp, cc_emulator.land.npp) +
+        weights['oflux'] * calculate_cost(esm_data_experiment.npp, cc_emulator.ocean.oflux) +
+        weights['cveg'] * calculate_cost(esm_data_experiment.cveg, cc_emulator.land.cveg) +
+        weights['csoil'] * calculate_cost(esm_data_experiment.csoil, cc_emulator.land.csoil) +
+        weights['catm'] * calculate_cost(esm_data_experiment.catm, cc_emulator.catm)
+    )
+
+    return cost
+
+
+# def calculate_cost(esm_arr, scc_arr):
+
+#     # Noramlise cost
+#     esm_arr = esm_arr/max(esm_arr)
+#     scc_arr = scc_arr/max(scc_arr)
+
+#     rss   = np.sum( (scc_arr-esm_arr)**2 )
+#     # n     = float(esm_arr.shape[0])
+#     # #ans   = 2.*(npar+1)/n + rss/(n*variance)
+#     # ans   = rss/(n*np.std(esm_arr))
+#     return rss
+
+def calculate_cost(esm_arr, scc_arr):
+    variance = np.var(esm_arr)
+    if variance == 0:
+        return 0.0  # avoids divide-by-zero for constant series
+    return np.sum((scc_arr - esm_arr)**2) / variance
+
 def calculate_cost_gen_func_cross_experiment(
     param,
     normalizer,
@@ -354,27 +622,55 @@ def calculate_cost_gen_func_cross_experiment(
     return: total cost across experiments.
     """
     cutoff = 30
-    par_t_l, par_t_e, par_c_l, par_c_half = normalizer.inv(param)
+    par_t_l, par_t_e, par_c_l, par_c_half, par_c_e, par_hyst, par_c_tan, par_slow, par_fast, par_c_tan2 = normalizer.inv(param)
     cost = 0
     for realisation in esm_data[model].keys():
         for experiment in esm_data[model][realisation].keys():
-            cost += cost_gen_func(
-                esm_data[model][realisation][experiment][flux0]
-                / esm_data[model][realisation][experiment][stock][0],
-                par_t_l,
-                par_t_e,
-                par_c_l,
-                par_c_half,
-                esm_data[model][realisation][experiment]["dtglb"],
-                esm_data[model][realisation][experiment]["catm"],
-                esm_data[model][realisation][experiment][stock],
-                esm_data[model][realisation][experiment][esm_flux],
-                cutoff=cutoff,
-            )
+            if esm_flux == "gpp" or esm_flux == "npp":
+                cost += cost_gen_func(
+                    esm_data[model][realisation][experiment][flux0],
+                    par_t_l,
+                    par_t_e,
+                    par_c_l,
+                    par_c_half,
+                    par_c_e,
+                    par_hyst,
+                    par_c_tan,
+                    par_slow,
+                    par_fast,
+                    par_c_tan2,
+                    esm_data[model][realisation][experiment]["dtglb"],
+                    esm_data[model][realisation][experiment]["catm"],
+                    esm_data[model][realisation][experiment][stock],
+                    esm_data[model][realisation][experiment][esm_flux],
+                    cutoff=cutoff,
+                    flux=esm_flux,
+                )
+            else:
+                cost += cost_gen_func(
+                    esm_data[model][realisation][experiment][flux0]
+                    / esm_data[model][realisation][experiment][stock][0],
+                    par_t_l,
+                    par_t_e,
+                    par_c_l,
+                    par_c_half,
+                    par_c_e,
+                    par_hyst,
+                    par_c_tan,
+                    par_slow,
+                    par_fast,
+                    par_c_tan2,
+                    esm_data[model][realisation][experiment]["dtglb"],
+                    esm_data[model][realisation][experiment]["catm"],
+                    esm_data[model][realisation][experiment][stock],
+                    esm_data[model][realisation][experiment][esm_flux],
+                    cutoff=cutoff,
+                    flux=esm_flux,
+                )
     return np.log(cost)
 
 
-def calculate_cost_gen_func(param, normalizer, flux0, catm, stock, dtglb, esm_flux):
+def calculate_cost_gen_func(param, normalizer, flux0, catm, stock, dtglb, esm_flux, flux_name):
     """
     Calculate the cost of the "gen_func" for the associated parameters and flux
     across all experiments for a given model.
@@ -400,18 +696,43 @@ def calculate_cost_gen_func(param, normalizer, flux0, catm, stock, dtglb, esm_fl
     return: total cost for the experiment.
     """
     # param are normalized (range [0,1]), so use inv method to 'de-normalize'
-    par_t_l, par_t_e, par_c_l, par_c_half = normalizer.inv(param)
-    ans1 = cost_gen_func(
-        flux0 / stock[0],
-        par_t_l,
-        par_t_e,
-        par_c_l,
-        par_c_half,
-        dtglb,
-        catm,
-        stock,
-        esm_flux,
-    )
+    par_t_l, par_t_e, par_c_l, par_c_half, par_c_e, par_hyst, par_c_tan, par_fast, par_slow, par_c_tan2 = normalizer.inv(param)
+    if flux_name == "gpp" or flux_name == "npp":
+        ans1 = cost_gen_func(
+            flux0,
+            par_t_l,
+            par_t_e,
+            par_c_l,
+            par_c_half,
+            par_c_e,
+            par_hyst,
+            par_c_tan,
+            par_fast,
+            par_slow,
+            par_c_tan2,
+            dtglb,
+            catm,
+            stock,
+            esm_flux,
+        )
+    else:
+        ans1 = cost_gen_func(
+            flux0 / stock[0],
+            par_t_l,
+            par_t_e,
+            par_c_l,
+            par_c_half,
+            par_c_e,
+            par_hyst,
+            par_c_tan,
+            par_fast,
+            par_slow,
+            par_c_tan2,
+            dtglb,
+            catm,
+            stock,
+            esm_flux,
+        )
     return np.log(ans1)
 
 
@@ -421,11 +742,18 @@ def cost_gen_func(
     par_t_e,
     par_c_l,
     par_c_half,
+    par_c_e,
+    par_hyst,
+    par_c_tan,
+    par_fast,
+    par_slow,
+    par_c_tan2,
     dtglb,
     catm,
     stock,
     esm_flux,
     cutoff=30,
+    flux="default",
 ):
     """
     Calculate the cost of the "general_calibration_fun" for the associated parameters
@@ -463,13 +791,22 @@ def cost_gen_func(
         par_t_e,
         par_c_l,
         par_c_half,
-        stock,
+        par_c_e,
+        par_hyst,
+        par_c_tan,
+        par_fast,
+        par_slow,
+        par_c_tan2,
+        stock - stock[0],
         stock[0],
         catm[0],
         dtglb,
         catm,
     )
-    scc_val = scc_val * stock
+    if flux == "gpp" or flux == "npp":
+        pass
+    else:
+        scc_val = scc_val * stock
     variance = hi_freq_variance(esm_flux, cutoff=cutoff)
     cost = np.sum((scc_val - esm_flux) ** 2)
     n = float(esm_flux.shape[0])
@@ -509,7 +846,7 @@ def calculate_cost_ocean_cross_experiment(
     docn, docnfac, ocntemp, docntemp = normalizer.inv(param)
     cost = 0
     for experiment in esm_data[model][realisation].keys():
-        num_steps = round(
+        num_t_eps = round(
             1
             + (
                 esm_data[model][realisation][experiment]["time"][-1]
@@ -520,7 +857,7 @@ def calculate_cost_ocean_cross_experiment(
         cost += cost_docn(
             esm_data[model][realisation][experiment]["catm0"],
             dtime0,
-            num_steps,
+            num_t_eps,
             esm_data[model][realisation][experiment]["time"][0],
             docn,
             docnfac,
@@ -536,7 +873,7 @@ def calculate_cost_ocean_cross_experiment(
 
 
 def costdocn1(
-    param, normalizer, catm0, dtime0, num_steps, t0, intime, catm, esm_oflux, dtocn
+    param, normalizer, catm0, dtime0, num_t_eps, t0, intime, catm, esm_oflux, dtocn
 ):
     """
     Calculate the "cost" of the ocean emulation for the associated parameters and flux
@@ -550,7 +887,7 @@ def costdocn1(
     - normalizer: normaliser object to translate par values from dimensional to
                   normalised and vice versa.
     - dtime0: timestep size. (year)
-    - num_steps: number of time steps for the ocean emulation.
+    - num_t_eps: number of time steps for the ocean emulation.
     - t0: initial year.
     - intime: array with ESM time.
     - catm: array with atmospheric carbon concentrations. (ppm)
@@ -566,7 +903,7 @@ def costdocn1(
     ans1 = cost_docn(
         catm0,
         dtime0,
-        num_steps,
+        num_t_eps,
         t0,
         docn,
         docnfac,
@@ -584,7 +921,7 @@ def costdocn1(
 def cost_docn(
     catm0,
     dtime0,
-    num_steps,
+    num_t_eps,
     t0,
     docn,
     docnfac,
@@ -606,7 +943,7 @@ def cost_docn(
     input:
     - catm0: pre-industrial atmospheric carbon concentration.
     - dtime0: timestep size.
-    - num_steps: number of time steps for the ocean emulation.
+    - num_t_eps: number of time steps for the ocean emulation.
     - t0: initial year.
     - docn: initial mixing depth for CO2 uptake. Calibrated parameter. (m)
     - docnfac: temperature dependence for change in mixing depth for CO2 uptake.
@@ -626,7 +963,7 @@ def cost_docn(
     scc_oflux = docn_func(
         catm0,
         dtime0,
-        num_steps,
+        num_t_eps,
         t0,
         docn,
         docnfac,
@@ -644,7 +981,7 @@ def cost_docn(
 
 
 def docn_func(
-    catm0, dtime0, num_steps, t0, docn, docnfac, ocntemp, docntemp, intime, catm, dtocn
+    catm0, dtime0, num_t_eps, t0, docn, docnfac, ocntemp, docntemp, intime, catm, dtocn
 ):
     """
     Use the ocean scheme (Joos et al. 1996) to emulate the ocean carbon exchange with
@@ -653,7 +990,7 @@ def docn_func(
     input:
     - catm0: pre-industrial atmospheric carbon concentration.
     - dtime0: timestep size. (year)
-    - num_steps: number of time steps for the ocean emulation.
+    - num_t_eps: number of time steps for the ocean emulation.
     - t0: initial year.
     - docn: initial mixing depth for CO2 uptake. Calibrated parameter. (m).
     - docnfac: temperature dependence for change in mixing depth for CO2 uptake.
@@ -672,10 +1009,10 @@ def docn_func(
         "docntemp": docntemp,
         "catm0": catm0,
     }
-    oceancycle = OceanCarbonCycle(dtime0, dtime0, num_steps, t0, **pars)
+    oceancycle = OceanCarbonCycle(dtime0, dtime0, num_t_eps, t0, **pars)
 
     # Interpolate data to ocean model time points
-    time_u = np.linspace(intime[0], intime[-1], num=num_steps, endpoint=True)
+    time_u = np.linspace(intime[0], intime[-1], num=num_t_eps, endpoint=True)
     catm_u = np.interp(time_u, intime, catm)
     dtocn_u = np.interp(time_u, intime, dtocn)
 
@@ -1025,3 +1362,25 @@ def plot_diagnostic(
         plt.savefig(
             f"{out_dir}/ALL/individual_flux_{fit.title[0].replace(', ', '_')}_{title}.png"
         )
+
+
+def create_range_from_guess(guess_list, range_factor):
+    """
+    Create a numpy array with a range centered at each element of guess_list,
+    with the minimum at guess/range and maximum at guess*range
+
+    input:
+    - guess_list: array where each element will be the center of a range.
+    - range_factor: factor deciding the size of the ranges to create.
+
+    return: 2D array where each element is a range for each element of guess_list,
+            the first element is the start of the range, at guess/range_factor, and
+            the second element is the end of the range, at guess*range_factor.
+    """
+    range_list = []
+    if range_factor <= 0:
+        print("WARNING: PROVIDED RANGE WAS NEGATIVE. OVERWRITING TO RANGE=2")
+        range_factor = 2
+    for guess in guess_list:
+        range_list.append([guess/range_factor, guess*range_factor])
+    return np.array(range_list)

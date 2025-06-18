@@ -35,6 +35,9 @@ def cli_parser():
     --npp                : Boolean flag that, if present, instucts the emulator to use
                            NPP, rather than GPP and vegetation respiration separately.
 
+    --sotre_results      : Boolean flag that, if present, instucts the emulator to store
+                           the results from the emulation.
+
     """
     # Supported models
     model_list = {
@@ -123,6 +126,9 @@ def cli_parser():
         # "cross_experiment",
         # "holistic",
         "hist-noLu",
+        "flat10",
+        "esm-ssp370",
+        "esm-ssp534-over",
     ]
     parser = argparse.ArgumentParser()
 
@@ -132,6 +138,7 @@ def cli_parser():
     parser.add_argument("-r", "--realisation", default="default")
     parser.add_argument("--save", action=argparse.BooleanOptionalAction)
     parser.add_argument("--npp", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--store_results", action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
 
@@ -148,4 +155,4 @@ def cli_parser():
     # TODO: maybe have a table somewhere in git with all available models so I can just
     # TODO: link to it?
 
-    return args.models, args.scenario, args.scenario_pars, args.realisation, args.save, args.npp
+    return args.models, args.scenario, args.scenario_pars, args.realisation, args.save, args.npp, args.store_results
