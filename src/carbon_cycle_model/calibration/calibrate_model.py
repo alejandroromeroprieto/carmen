@@ -112,19 +112,19 @@ SCENARIO = "CMIP6"
 
 
 model_experiment_dict = {
-    # "ACCESS-ESM1-5":    ["1pctco2", "ssp126", "ssp245", "ssp370", "ssp534-over", "ssp585"],
-    # "BCC-CSM2-MR":      ["1pctco2", "ssp126", "ssp245", "ssp370", "ssp585"],
-    # "CanESM5":          ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "ssp434", "ssp460", "ssp534-over", "ssp585"],
-    # "CESM2":            ["1pctco2", "ssp126", "ssp245", "ssp370", "ssp585"],
-    # "CMCC-ESM2":        ["1pctco2", "ssp126", "ssp245", "ssp370", "ssp534-over", "ssp585"],
-    # "CNRM-ESM2-1":      ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "ssp434", "ssp460", "ssp534-over", "ssp585"],
-    # "GFDL-ESM4":        ["1pctco2", "ssp126", "ssp370"],
-    # "IPSL-CM6A-LR":     ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "ssp434", "ssp460", "ssp534-over", "ssp585"],
-    # "MIROC-ES2L":       ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "ssp534-over", "ssp585"],
-    "MPI-ESM1-2-LR":    ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "esm-ssp534-over", "ssp585", "flat10"] # "abrupt-4xCO2"],
-    # "MRI-ESM2-0":       ["1pctco2", "ssp585"],
-    # "NorESM2-LM":       ["1pctco2", "ssp126", "ssp245", "ssp370", "ssp534-over", "ssp585"],
-    # "UKESM1-0-LL":      ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "ssp434", "ssp534-over", "ssp585", "abrupt-4xCO2"],
+    "ACCESS-ESM1-5":    ["1pctco2", "ssp126", "ssp245", "ssp370", "ssp534-over", "ssp585"],
+    "BCC-CSM2-MR":      ["1pctco2", "ssp126", "ssp245", "ssp370", "ssp585"],
+    "CanESM5":          ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "ssp434", "ssp460", "ssp534-over", "ssp585"],
+    "CESM2":            ["1pctco2", "ssp126", "ssp245", "ssp370", "ssp585"],
+    "CMCC-ESM2":        ["1pctco2", "ssp126", "ssp245", "ssp370", "ssp534-over", "ssp585"],
+    "CNRM-ESM2-1":      ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "ssp434", "ssp460", "ssp534-over", "ssp585"],
+    "GFDL-ESM4":        ["1pctco2", "ssp126", "ssp370"],
+    "IPSL-CM6A-LR":     ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "ssp434", "ssp460", "ssp534-over", "ssp585"],
+    "MIROC-ES2L":       ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "ssp534-over", "ssp585"],
+    "MPI-ESM1-2-LR":    ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "esm-ssp534-over", "ssp585"],#, "flat10"], # "abrupt-4xCO2"],
+    "MRI-ESM2-0":       ["1pctco2", "ssp585"],
+    "NorESM2-LM":       ["1pctco2", "ssp126", "ssp245", "ssp370", "ssp534-over", "ssp585"],
+    "UKESM1-0-LL":      ["1pctco2", "ssp119", "ssp126", "ssp245", "ssp370", "ssp434", "ssp534-over", "ssp585"], # "abrupt-4xCO2"],
 }
 
 
@@ -198,6 +198,43 @@ slow_inertia = [0, 0]
 # #                         docn,     docnfac   ocntemp   docntemp
 # oflux_range = np.array([[30, 90.0], [-10, 10], [-1, 0.2], [-0.5, 10]])
 
+# Coherent with literature
+                    # gpp_t_l  gpp_t_e  gpp_c_l gpp_c_half  gpp_c_e  gpp_hyst  gpp_c_tan (fast_inertia) gpp_fast gpp_slow gpp_c_tan2 (slow inertia)
+# Stabilised                            [-3, 0]             [-3, 0]              [-1, 0]
+# gpp_range = np.array([[-3, 5], [-3, 5], [-5, 1], [0, 2000], [-5, 3], [-10, 10], fast_inertia, [0.8, 1], [0.6, 1], slow_inertia])
+
+# #                     lit_t_l  lit_t_e  lit_c_l   sres_c_half  c_e exxtra  exxtrac
+# lit_range = np.array([[-3, 5], [-3, 5], [-1, 5], [0, 2000], [-3, 5], [-10, 10], fast_inertia, [0.8, 1], [0.6, 1], slow_inertia])
+
+# #                      vres_t_l  vres_t_e  vres_c_l  vres_c_half
+# vres_range = np.array([[-3, 2.0], [-3, 2.5], [-1, 5], [0, 2000], [-3, 5], [-10, 10], fast_inertia, [0.8, 1], [0.6, 1], slow_inertia])
+
+# #                      sres_t_l  sres_t_e  sres_c_l  sres_c_half
+# sres_range = np.array([[-3, 2.0], [-3, 2.5], [-1, 5], [0, 2000], [-3, 5], [-10, 10], fast_inertia, [0.8, 1], [0.6, 1], slow_inertia])
+
+# #                      npp_t_l  npp_t_e  npp_c_l  npp_c_half
+# npp_range = np.array([[-3, 5], [-3, 5], [-5, 1], [0, 2000], [-5, 3], [-20, 10], fast_inertia, [0.8, 1], [0.6, 1], slow_inertia])
+
+# #                     gpp_t_l  gpp_t_e   gpp_c_l [-3, 0/1]  gpp_c_half            stable   [-1, 0.2]
+gpp_range = np.array([[-3, 5], [-3, 5], [-5, 0], [0, 2000], [-5, 0], [-10, 10], fast_inertia, [0.8, 1], [0.6, 1], slow_inertia])
+
+#                     lit_t_l  lit_t_e  lit_c_l   sres_c_half  c_e exxtra  exxtrac
+lit_range = np.array([[-3, 5], [-3, 5], [-0, 5], [0, 2000], [-0, 5], [-10, 10], fast_inertia, [0.8, 1], [0.6, 1], slow_inertia])
+
+#                      vres_t_l  vres_t_e  vres_c_l  vres_c_half
+vres_range = np.array([[-3, 2.0], [-3, 2.5], [-0, 5], [0, 2000], [-0, 5], [-10, 10], fast_inertia, [0.8, 1], [0.6, 1], slow_inertia])
+
+#                      sres_t_l  sres_t_e  sres_c_l  sres_c_half
+sres_range = np.array([[-3, 2.0], [-3, 2.5], [-0, 5], [0, 2000], [-0, 5], [-10, 10], fast_inertia, [0.8, 1], [0.6, 1], slow_inertia])
+
+#                      npp_t_l  npp_t_e  npp_c_l  npp_c_half
+npp_range = np.array([[-3, 5], [-3, 5], [-5, 0], [0, 2000], [-5, 0], [-20, 10], fast_inertia, [0.8, 1], [0.6, 1], slow_inertia])
+
+#                         docn,     docnfac   ocntemp   docntemp
+oflux_range = np.array([[35, 70.0], [-10, 10], [0.00, 0.3], [0, 10]])
+# oflux_range = np.array([[30, 90.0], [-10, 10], [-1, 0.2], [-0.5, 10]])
+
+
 
 #  ========================  Initial guesses for solutions  ========================
 #                      gpp_t_l  gpp_t_e  gpp_c_l  gpp_c_half
@@ -211,7 +248,7 @@ initial_sres_guess_dim = np.array([0, 0, 0, 10, 0, 0, 0, 0.8, 0.98, 0])
 #                      npp_t_l  npp_t_e  npp_c_l  npp_c_half
 initial_npp_guess_dim = np.array([0, 0, 0, 10, 0, 0, 0, 0.8, 0.98, 0])
 #                             docn  docnfac  ocntemp  docntemp
-initial_oflux_guess_dim = np.array([55, 0.33, 0.05, -0.1])
+initial_oflux_guess_dim = np.array([50.9, 0, 0.0423, -0.1])
 
 
 # Tolerance values for our calibration
@@ -232,7 +269,7 @@ PREFIX_DETRENDED = CWD + "/src/carbon_cycle_model/data/scenarios/detrended_wrt_d
 
 # Number of times we cycle through the optimization for each component
 # to try to avoid potential local minima:
-NUM_REPEAT = 10
+NUM_REPEAT = 20
 NMSAMP_GPP = NUM_REPEAT
 NMSAMP_LIT = NUM_REPEAT
 NMSAMP_VRES = NUM_REPEAT
@@ -240,7 +277,7 @@ NMSAMP_SRES = NUM_REPEAT
 NMSAMP_NPP = NUM_REPEAT
 # ocean function, and by extension its calibration, is relatively slower
 # So you may want to choose a smaller value here
-NMSAMP_DOCN = 1
+NMSAMP_DOCN = 10
 
 # Switch that allows either return of the flux coefficient (i.e. flux/stock)
 # (RETCOEF=True), or return of absolute flux (RETCOEF=False). It also
@@ -471,10 +508,10 @@ for model, experiment_list in model_experiment_dict.items():
             jarr.append(jj)
 
             # Contour par1 and par3 (vres_t_l, vres_c_l)
-            jj = [2, 3]
+            jj = [2, 4]
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par3,
-                par2=par4,
+                par2=par5,
                 cost_func=calculate_cost_gen_func,
                 normaliser=gpp_normaliser,
                 normaliser_par_ind=jj,
@@ -488,9 +525,9 @@ for model, experiment_list in model_experiment_dict.items():
             jarr.append(jj)
 
             # Contour par4 and par5 (vres_c_e, vres_hyst)
-            jj = [4, 5]
+            jj = [3, 5]
             par1dim, par2dim, costs = prepare_contour_data(
-                par1=par5,
+                par1=par4,
                 par2=par6,
                 cost_func=calculate_cost_gen_func,
                 normaliser=gpp_normaliser,
@@ -504,10 +541,10 @@ for model, experiment_list in model_experiment_dict.items():
             costarr.append(costs)
             jarr.append(jj)
 
-            jj = [6, 9]
+            jj = [6, 7]
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par7,
-                par2=par10,
+                par2=par8,
                 cost_func=calculate_cost_gen_func,
                 normaliser=gpp_normaliser,
                 normaliser_par_ind=jj,
@@ -521,9 +558,9 @@ for model, experiment_list in model_experiment_dict.items():
             costarr.append(costs)
             jarr.append(jj)
 
-            jj = [7, 8]
+            jj = [9, 8]
             par1dim, par2dim, costs = prepare_contour_data(
-                par1=par8,
+                par1=par10,
                 par2=par9,
                 cost_func=calculate_cost_gen_func,
                 normaliser=gpp_normaliser,
@@ -728,10 +765,10 @@ for model, experiment_list in model_experiment_dict.items():
             jarr.append(jj)
 
             # Contour par1 and par3 (vres_t_l, vres_c_l)
-            jj = [2, 3]
+            jj = [2, 4]
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par3,
-                par2=par4,
+                par2=par5,
                 cost_func=calculate_cost_gen_func,
                 normaliser=lit_normalizer,
                 normaliser_par_ind=jj,
@@ -745,9 +782,9 @@ for model, experiment_list in model_experiment_dict.items():
             jarr.append(jj)
 
             # Contour par4 and par5 (vres_c_e, vres_hyst)
-            jj = [4, 5]
+            jj = [3, 5]
             par1dim, par2dim, costs = prepare_contour_data(
-                par1=par5,
+                par1=par4,
                 par2=par6,
                 cost_func=calculate_cost_gen_func,
                 normaliser=lit_normalizer,
@@ -761,10 +798,10 @@ for model, experiment_list in model_experiment_dict.items():
             costarr.append(costs)
             jarr.append(jj)
 
-            jj = [6, 9]
+            jj = [6, 7]
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par7,
-                par2=par10,
+                par2=par8,
                 cost_func=calculate_cost_gen_func,
                 normaliser=lit_normalizer,
                 normaliser_par_ind=jj,
@@ -778,9 +815,9 @@ for model, experiment_list in model_experiment_dict.items():
             costarr.append(costs)
             jarr.append(jj)
 
-            jj = [7, 8]
+            jj = [9, 8]
             par1dim, par2dim, costs = prepare_contour_data(
-                par1=par8,
+                par1=par10,
                 par2=par9,
                 cost_func=calculate_cost_gen_func,
                 normaliser=lit_normalizer,
@@ -982,10 +1019,10 @@ for model, experiment_list in model_experiment_dict.items():
             jarr.append(jj)
 
             # Contour par1 and par3 (vres_t_l, vres_c_l)
-            jj = [2, 3]
+            jj = [2, 4]
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par3,
-                par2=par4,
+                par2=par5,
                 cost_func=calculate_cost_gen_func,
                 normaliser=vres_normalizer,
                 normaliser_par_ind=jj,
@@ -999,9 +1036,9 @@ for model, experiment_list in model_experiment_dict.items():
             jarr.append(jj)
 
             # Contour par4 and par5 (vres_c_e, vres_hyst)
-            jj = [4, 5]
+            jj = [3, 5]
             par1dim, par2dim, costs = prepare_contour_data(
-                par1=par5,
+                par1=par4,
                 par2=par6,
                 cost_func=calculate_cost_gen_func,
                 normaliser=vres_normalizer,
@@ -1015,10 +1052,10 @@ for model, experiment_list in model_experiment_dict.items():
             costarr.append(costs)
             jarr.append(jj)
 
-            jj = [6, 9]
+            jj = [6, 7]
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par7,
-                par2=par10,
+                par2=par8,
                 cost_func=calculate_cost_gen_func,
                 normaliser=vres_normalizer,
                 normaliser_par_ind=jj,
@@ -1032,9 +1069,9 @@ for model, experiment_list in model_experiment_dict.items():
             costarr.append(costs)
             jarr.append(jj)
 
-            jj = [7, 8]
+            jj = [9, 8]
             par1dim, par2dim, costs = prepare_contour_data(
-                par1=par8,
+                par1=par10,
                 par2=par9,
                 cost_func=calculate_cost_gen_func,
                 normaliser=vres_normalizer,
@@ -1235,10 +1272,10 @@ for model, experiment_list in model_experiment_dict.items():
             jarr.append(jj)
 
             # Contour par1 and par3 (vres_t_l, vres_c_l)
-            jj = [2, 3]
+            jj = [2, 4]
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par3,
-                par2=par4,
+                par2=par5,
                 cost_func=calculate_cost_gen_func,
                 normaliser=sres_normalizer,
                 normaliser_par_ind=jj,
@@ -1252,9 +1289,9 @@ for model, experiment_list in model_experiment_dict.items():
             jarr.append(jj)
 
             # Contour par4 and par5 (vres_c_e, vres_hyst)
-            jj = [4, 5]
+            jj = [3, 5]
             par1dim, par2dim, costs = prepare_contour_data(
-                par1=par5,
+                par1=par4,
                 par2=par6,
                 cost_func=calculate_cost_gen_func,
                 normaliser=sres_normalizer,
@@ -1268,10 +1305,10 @@ for model, experiment_list in model_experiment_dict.items():
             costarr.append(costs)
             jarr.append(jj)
 
-            jj = [6, 9]
+            jj = [6, 7]
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par7,
-                par2=par10,
+                par2=par8,
                 cost_func=calculate_cost_gen_func,
                 normaliser=sres_normalizer,
                 normaliser_par_ind=jj,
@@ -1279,15 +1316,14 @@ for model, experiment_list in model_experiment_dict.items():
                 esm_vals=esm_vals,
             )
 
-
             par1arr.append(par1dim)
             par2arr.append(par2dim)
             costarr.append(costs)
             jarr.append(jj)
 
-            jj = [7, 8]
+            jj = [9, 8]
             par1dim, par2dim, costs = prepare_contour_data(
-                par1=par8,
+                par1=par10,
                 par2=par9,
                 cost_func=calculate_cost_gen_func,
                 normaliser=sres_normalizer,
@@ -1488,10 +1524,10 @@ for model, experiment_list in model_experiment_dict.items():
             jarr.append(jj)
 
             # Contour par1 and par3 (vres_t_l, vres_c_l)
-            jj = [2, 3]
+            jj = [2, 4]
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par3,
-                par2=par4,
+                par2=par5,
                 cost_func=calculate_cost_gen_func,
                 normaliser=npp_normalizer,
                 normaliser_par_ind=jj,
@@ -1505,9 +1541,9 @@ for model, experiment_list in model_experiment_dict.items():
             jarr.append(jj)
 
             # Contour par4 and par5 (vres_c_e, vres_hyst)
-            jj = [4, 5]
+            jj = [3, 5]
             par1dim, par2dim, costs = prepare_contour_data(
-                par1=par5,
+                par1=par4,
                 par2=par6,
                 cost_func=calculate_cost_gen_func,
                 normaliser=npp_normalizer,
@@ -1521,20 +1557,24 @@ for model, experiment_list in model_experiment_dict.items():
             costarr.append(costs)
             jarr.append(jj)
 
-            jj = [6, 9]
+            jj = [6, 7]
             par1dim, par2dim, costs = prepare_contour_data(
                 par1=par7,
-                par2=par10,
+                par2=par8,
                 cost_func=calculate_cost_gen_func,
                 normaliser=npp_normalizer,
                 normaliser_par_ind=jj,
                 nor_sol=p_bar,
                 esm_vals=esm_vals,
             )
+            par1arr.append(par1dim)
+            par2arr.append(par2dim)
+            costarr.append(costs)
+            jarr.append(jj)
 
-            jj = [7, 8]
+            jj = [9, 8]
             par1dim, par2dim, costs = prepare_contour_data(
-                par1=par8,
+                par1=par10,
                 par2=par9,
                 cost_func=calculate_cost_gen_func,
                 normaliser=npp_normalizer,
@@ -1559,6 +1599,19 @@ for model, experiment_list in model_experiment_dict.items():
             title = [model + ", " + experiment, FLUX_NAME]
             esm_flux = esm_data[model][realisation][experiment]["npp"]
 
+            # # If the RETCOEF flag is True, divide by the relevant stock to obtain
+            # # the efficiency parameter exclusively
+            # # if RETCOEF:
+            # #     esm_flux = esm_flux / esm_data[model][realisation][experiment]["cveg"]
+            # # else:
+            # #     scc_npp = scc_npp * esm_data[model][realisation][experiment]["cveg"]
+            # if RETCOEF:
+            #     # esm_flux = esm_flux / esm_data[model][realisation][experiment]["cveg"]
+            #     esm_flux = esm_flux / esm_data[model][realisation][experiment]["cveg"]
+            #     scc_gpp = scc_npp / esm_data[model][realisation][experiment]["cveg"]
+            # else:
+            #     # scc_gpp = scc_gpp * esm_data[model][realisation][experiment]["cveg"]
+            #     pass
             # If the RETCOEF flag is True, divide by the relevant stock to obtain
             # the efficiency parameter exclusively
             # if RETCOEF:
@@ -1568,9 +1621,9 @@ for model, experiment_list in model_experiment_dict.items():
             if RETCOEF:
                 # esm_flux = esm_flux / esm_data[model][realisation][experiment]["cveg"]
                 esm_flux = esm_flux / esm_data[model][realisation][experiment]["cveg"]
-                scc_gpp = scc_npp / esm_data[model][realisation][experiment]["cveg"]
+                scc_npp = scc_npp / esm_data[model][realisation][experiment]["cveg"]
             else:
-                # scc_gpp = scc_gpp * esm_data[model][realisation][experiment]["cveg"]
+                # scc_npp = scc_npp * esm_data[model][realisation][experiment]["cveg"]
                 pass
 
             fit_npp = Data(

@@ -111,7 +111,7 @@ def cli_parser():
     scenario_opts = [
         "abrupt-4xCO2",
         "1pctco2",
-        # "1pctco2-cdr",
+        "1pctco2-cdr",
         "ssp119",
         "ssp126",
         "ssp245",
@@ -128,7 +128,11 @@ def cli_parser():
         "hist-noLu",
         "flat10",
         "esm-ssp370",
+        "esm-ssp119",
+        "esm-ssp126",
+        "esm-ssp245",
         "esm-ssp534-over",
+        "esm-ssp585",
     ]
     parser = argparse.ArgumentParser()
 

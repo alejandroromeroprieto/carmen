@@ -77,9 +77,14 @@ def general_calibration_fun(
 
     # Stock factor
     stock_pro = stock_ano / stock0
-    f_stock = (1.0 + (par_c_l * stock_pro) / (1 + stock_pro**2)) * np.exp(
-        par_c_e * np.maximum(-0.2, stock_pro)
-    )
+    # f_stock = (1.0 + (par_c_l * stock_pro) / (1 + stock_pro**2)) * np.exp(
+    #     par_c_e * np.maximum(-0.2, stock_pro)
+    # )
+
+    f_stock = (1.0 + (par_c_l * stock_pro) / (1 + stock_pro**2) ) * np.minimum(5, np.exp(
+        par_c_e * stock_pro
+    ))
+
     # stock_pro = stock_ano / stock0
     # f_stock = (1 + par_c_l* np.tanh(par_c_e * stock_pro))
     # f_stock = (1 + par_c_l* np.tanh(par_c_e * stock_pro + np.exp(par_c_e * stock_pro)  ))

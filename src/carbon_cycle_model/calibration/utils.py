@@ -626,47 +626,47 @@ def calculate_cost_gen_func_cross_experiment(
     cost = 0
     for realisation in esm_data[model].keys():
         for experiment in esm_data[model][realisation].keys():
-            if esm_flux == "gpp" or esm_flux == "npp":
-                cost += cost_gen_func(
-                    esm_data[model][realisation][experiment][flux0],
-                    par_t_l,
-                    par_t_e,
-                    par_c_l,
-                    par_c_half,
-                    par_c_e,
-                    par_hyst,
-                    par_c_tan,
-                    par_slow,
-                    par_fast,
-                    par_c_tan2,
-                    esm_data[model][realisation][experiment]["dtglb"],
-                    esm_data[model][realisation][experiment]["catm"],
-                    esm_data[model][realisation][experiment][stock],
-                    esm_data[model][realisation][experiment][esm_flux],
-                    cutoff=cutoff,
-                    flux=esm_flux,
-                )
-            else:
-                cost += cost_gen_func(
-                    esm_data[model][realisation][experiment][flux0]
-                    / esm_data[model][realisation][experiment][stock][0],
-                    par_t_l,
-                    par_t_e,
-                    par_c_l,
-                    par_c_half,
-                    par_c_e,
-                    par_hyst,
-                    par_c_tan,
-                    par_slow,
-                    par_fast,
-                    par_c_tan2,
-                    esm_data[model][realisation][experiment]["dtglb"],
-                    esm_data[model][realisation][experiment]["catm"],
-                    esm_data[model][realisation][experiment][stock],
-                    esm_data[model][realisation][experiment][esm_flux],
-                    cutoff=cutoff,
-                    flux=esm_flux,
-                )
+            # if esm_flux == "gpp" or esm_flux == "npp":
+            #     cost += cost_gen_func(
+            #         esm_data[model][realisation][experiment][flux0],
+            #         par_t_l,
+            #         par_t_e,
+            #         par_c_l,
+            #         par_c_half,
+            #         par_c_e,
+            #         par_hyst,
+            #         par_c_tan,
+            #         par_slow,
+            #         par_fast,
+            #         par_c_tan2,
+            #         esm_data[model][realisation][experiment]["dtglb"],
+            #         esm_data[model][realisation][experiment]["catm"],
+            #         esm_data[model][realisation][experiment][stock],
+            #         esm_data[model][realisation][experiment][esm_flux],
+            #         cutoff=cutoff,
+            #         flux=esm_flux,
+            #     )
+            # else:
+            cost += cost_gen_func(
+                esm_data[model][realisation][experiment][flux0]
+                / esm_data[model][realisation][experiment][stock][0],
+                par_t_l,
+                par_t_e,
+                par_c_l,
+                par_c_half,
+                par_c_e,
+                par_hyst,
+                par_c_tan,
+                par_slow,
+                par_fast,
+                par_c_tan2,
+                esm_data[model][realisation][experiment]["dtglb"],
+                esm_data[model][realisation][experiment]["catm"],
+                esm_data[model][realisation][experiment][stock],
+                esm_data[model][realisation][experiment][esm_flux],
+                cutoff=cutoff,
+                flux=esm_flux,
+            )
     return np.log(cost)
 
 
@@ -697,42 +697,44 @@ def calculate_cost_gen_func(param, normalizer, flux0, catm, stock, dtglb, esm_fl
     """
     # param are normalized (range [0,1]), so use inv method to 'de-normalize'
     par_t_l, par_t_e, par_c_l, par_c_half, par_c_e, par_hyst, par_c_tan, par_fast, par_slow, par_c_tan2 = normalizer.inv(param)
-    if flux_name == "gpp" or flux_name == "npp":
-        ans1 = cost_gen_func(
-            flux0,
-            par_t_l,
-            par_t_e,
-            par_c_l,
-            par_c_half,
-            par_c_e,
-            par_hyst,
-            par_c_tan,
-            par_fast,
-            par_slow,
-            par_c_tan2,
-            dtglb,
-            catm,
-            stock,
-            esm_flux,
-        )
-    else:
-        ans1 = cost_gen_func(
-            flux0 / stock[0],
-            par_t_l,
-            par_t_e,
-            par_c_l,
-            par_c_half,
-            par_c_e,
-            par_hyst,
-            par_c_tan,
-            par_fast,
-            par_slow,
-            par_c_tan2,
-            dtglb,
-            catm,
-            stock,
-            esm_flux,
-        )
+    # if flux_name == "gpp" or flux_name == "npp":
+    #     ans1 = cost_gen_func(
+    #         flux0,
+    #         par_t_l,
+    #         par_t_e,
+    #         par_c_l,
+    #         par_c_half,
+    #         par_c_e,
+    #         par_hyst,
+    #         par_c_tan,
+    #         par_fast,
+    #         par_slow,
+    #         par_c_tan2,
+    #         dtglb,
+    #         catm,
+    #         stock,
+    #         esm_flux,
+    #     )
+    # else:
+    ans1 = cost_gen_func(
+        flux0 / stock[0],
+        par_t_l,
+        par_t_e,
+        par_c_l,
+        par_c_half,
+        par_c_e,
+        par_hyst,
+        par_c_tan,
+        par_fast,
+        par_slow,
+        par_c_tan2,
+        dtglb,
+        catm,
+        stock,
+        esm_flux,
+        flux=flux_name,
+    )
+
     return np.log(ans1)
 
 
@@ -804,7 +806,11 @@ def cost_gen_func(
         catm,
     )
     if flux == "gpp" or flux == "npp":
-        pass
+        # pass
+        # In order to have good cost plots we normalise GPP and NPP by the initial stock,
+        # like other quantities, to be able to see cost variations better. But after the cost
+        # calculation, we need to undo this normalisation.
+        scc_val = scc_val * stock[0]
     else:
         scc_val = scc_val * stock
     variance = hi_freq_variance(esm_flux, cutoff=cutoff)
