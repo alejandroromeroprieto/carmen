@@ -7,10 +7,13 @@ mixed layer, and an impulse-response function is used to approximate the carbon
 export towards the deep ocean.
 """
 
-import math
 import numpy as np
 
-from carbon_cycle_model.constants import GAS_EXCHANGE_COEF, OCEAN_AREA, OCEAN_PRESSURE_SEN, PPM2GT
+from carbon_cycle_model.constants import (
+    GAS_EXCHANGE_COEF,
+    OCEAN_AREA,
+    PPM2GT,
+)
 from carbon_cycle_model import defaults
 from carbon_cycle_model.ocean_component.utils import joos_response
 
@@ -31,15 +34,19 @@ class OceanCarbonCycle:
                     (year)
         - num_steps: number of steps the general carbon cycle emulator is expected to run.
                      (dimensionless)
-        - docn: parameter representing initial mixing depth for CO2 uptake. (m)
-        - docnfac: parameter representing the temperature dependence of the mixing layer
-                   depth on CO2 uptake. (dimensionless)
+        - docn: parameter representing pre-industrial mixing depth for CO2 uptake. (m)
         - ocntemp: parameter controlling the modulation of the ocean partial carbon
                    pressure on sea surface temperature. This is an addition to the base
                    Joos model. (1/K)
-        - docntemp: parameter controlling the modulation of the ocean mixed layer on
+        - docntemp: parameter controlling the modulation of the ocean mixed layer depth on
                     sea surface temperature. This is an addition to the base Joos model
                     (1/K)
+        - timestep_ind: index pointing at the current timestep.
+        - n4occ: number of ocean steps per parent-model step.
+        - rjoos: joos response function for all timesteps.
+        - ocn_uptake: timeseries of carbon uptake by the ocean for each ocean timestep
+                      (positive into the ocean) (Gtc/yr).
+
 
     The initialisation function takes the following arguments:
     - dt_model: timestep used for the general carbon cycle emulator. (year)
@@ -76,7 +83,6 @@ class OceanCarbonCycle:
 
         # Parameters
         self.docn = kwargs.get("docn", defaults.DOCN_DEFAULT)
-        self.docnfac = kwargs.get("docnfac", defaults.DOCNFAC_DEFAULT)
         self.ocntemp = kwargs.get("ocntemp", defaults.OCNTEMP_DEFAULT)
         self.docntemp = kwargs.get("docntemp", defaults.DOCNTEMP_DEFAULT)
 
@@ -93,7 +99,7 @@ class OceanCarbonCycle:
         timeocc = np.arange(t0, t0 + num_steps * dt4occ, dt4occ)
         self.rjoos = joos_response(timeocc)
 
-        # Create an array to store ocean uptake values
+        # Create an array to store ocean uptake values for each ocean step.
         self.ocn_uptake = np.zeros(len(timeocc))
 
     def molcon_to_ppm(self, dmol):
@@ -115,9 +121,6 @@ class OceanCarbonCycle:
         if dmol >= dcutoff:
             ppm = pcutoff + derivcut * (dmol - dcutoff)
         else:
-            # ppm = dmol*0.1*(a1*10. + a2*dd - a3*math.pow(dd,2)+ a4*math.pow(dd,3) -
-            #       a5*0.1*math.pow(dd,4) )
-            # This gives the same but is a bit faster
             dd = dmol / 100.0
             ppm = (
                 dmol
@@ -142,93 +145,14 @@ class OceanCarbonCycle:
 
         mol_units_converter = 1.722e17
 
-        # TODO: this is here for the archive, but delete for clean version of model
-        # Modulation of the mixed layer depth.
-        # I tested many different functional dependence here for this modulation:
-        # docntemp = self.docn * (
-        #     1.0
-        #     + np.maximum(
-        #         -0.5,
-        #         np.minimum(1.0, (np.exp(-self.docntemp * dt_ocn) - 1)),
-        #     )
-        # )
-        # docntemp = self.docn * (
-        #     1.0
-        #     + np.maximum(
-        #         -0.5,
-        #         np.minimum(1.0, (self.docntemp * dt_ocn)),
-        #     )
-        # )
-        # docntemp = self.docn * np.maximum(0.5, np.minimum(2, (1 + self.docnfac * dt_ocn) * np.exp(self.docntemp * dt_ocn)))
-        # docntemp = self.docn * np.maximum(0.5, np.minimum(2, self.docnfac * np.exp(self.docntemp * dt_ocn)))
-        # docntemp = self.docn * np.maximum(0.5, np.minimum(2, self.docnfac * np.exp(self.docntemp * dt_ocn)))
-        # docntemp = self.docn * (self.docnfac/(1+np.exp(self.docntemp * dt_ocn)) + 0.5)
-        # temp = self.docnfac * (np.exp(self.docntemp * dt_ocn) - 1)
-        # docntemp = self.docn * (
-        #     1 - temp/(1+temp)
-        # )  #  4.678074064298765
-        # docntemp = 20 + (self.docn - 20)*np.exp(self.docntemp*dt_ocn)
-        # docntemp = self.docn * (np.exp()/(1 + 2))
-
-        # In practice the choice did not seem to have a big impact on the results, so a logistic
-        # appraoch was taken to moderate the behaviour of the modulate at big/small temperature
-        # anomalies.
-        # For context: OSCAR does the following:
-        # d_0*par*e^(par*T))  (Eq__D_mld in link below) but this explodes for large Ts
-        # https://github.com/tgasser/OSCAR/blob/master/core_fct/mod_process.py
-
-        # logistic_term = 1 / (1 + np.exp(self.docntemp * dt_ocn))
-        # bounded_term = np.maximum(0.5, np.minimum(0.5, logistic_term))
-        # docntemp = self.docn * (bounded_term + 0.5)
-
-        # mld_floor = 0.9  # Minimum scaling factor
-        # mld_ceiling = 1.1 # Maximum scaling factor
-
-        # logistic_term = 1 / (1 + np.exp(self.docntemp * dt_ocn))
-        # scaling_factor = mld_floor + (mld_ceiling - mld_floor) * logistic_term
-
-        # docntemp = self.docn * scaling_factor 
-
-        # # A simple, robust solution that dampens the positive feedback.
-        # # This assumes self.docntemp from your calibration is POSITIVE.
-        # mld_floor = 0.9 # Set a very safe floor.
-
-        # # This function starts at 1.0 and decays towards the floor.
-        # # It's simpler than the logistic and guaranteed to be stable.
-        # scaling_factor = mld_floor + (1 - mld_floor) * np.exp(-self.docntemp * dt_ocn)
-
-        # docntemp = self.docn * scaling_factor
-
         docntemp = self.docn * (1 / (1 + np.exp(self.docntemp * dt_ocn)) + 0.5)
-
-        # docntemp = self.docn * (1 / (1 + np.exp(self.docntemp * (dt_ocn+1.7))) + 0.7)
-
-        # The above option seemed to have worst outcomes
-        # temp = self.docnfac * (np.exp(self.docntemp * dt_ocn) - 1)
-        # temp_abs = self.docnfac * (np.exp(np.abs(self.docntemp * dt_ocn)) - 1)
-        # docntemp = self.docn * (
-        #     1 - temp/(1+temp_abs)
-        # )
-        # docntemp = self.docn * (
-        #     1.0
-        #     + np.maximum(
-        #         -0.5,
-        #         np.minimum(1.0, self.docnfac * dt_ocn))),
-        # docntemp = self.docn * (
-        #     1.0
-        #     + np.maximum(
-        #         -0.5,
-        #         np.minimum(1.0, (np.exp(self.docntemp * dt_ocn) - 1)),
-        #     )
-        # ) # 3.163281781484243
-        # TODO: self.docnfac is not needed anymore
 
         cmol = mol_units_converter / (docntemp * OCEAN_AREA)
 
         dtstep = self.dt / self.n4occ
         grad_catm = (catm - catm1) / self.dt
 
-        # The rest of this function is as taken from Glen Harris code
+        # The rest of this function is as originally coded by Glen Harris
         for k0 in range(self.n4occ):
             total_uptake = 0  # Total uptake for this dtstep
             k = k0 + 1
@@ -250,21 +174,9 @@ class OceanCarbonCycle:
             msum = dtstep * msum
             psum = self.molcon_to_ppm(msum)  # psum has units of ppm
             # Net C0_2 flux
-            # I guess that we take catm0 as in pre-industrial the partial pressures
-            # would be the same
-            # due to the equilibrium assumption.
-            # TODO: this is here for the archive, but delete for clean version of model
-            # The calibration result did not show high sensibility to the choice of function
-            # employed here to modify the ocean partial pressure. Consequently, we used a
-            # logisitc function again as a well-behaved function for large tempreatures.
-            cocn = (self.catm0 + psum) * np.exp(self.ocntemp * dt_ocn) # original
-            # The only one avoiding instabilities for SSP585 MIROC (8 C)
-            # cocn = (self.catm0 + psum) * (1 / (1 + np.exp(-self.ocntemp * dt_ocn)) + 0.5)
-            # TODO: change name of self.ocntemp
-            # cocn = (self.catm0 + psum) * np.exp(OCEAN_PRESSURE_SEN * dt_ocn)
-            # cocn = (self.catm0 + psum) * np.exp(np.minimum(0, OCEAN_PRESSURE_SEN * dt_ocn))
 
-            # uptakenew = (self.ocntemp) * (catmk - cocn)
+            cocn = (self.catm0 + psum) * np.exp(self.ocntemp * dt_ocn)  # original
+
             uptakenew = GAS_EXCHANGE_COEF * (catmk - cocn)
             self.ocn_uptake[istep] = uptakenew
             total_uptake += uptakenew * dtstep * PPM2GT
