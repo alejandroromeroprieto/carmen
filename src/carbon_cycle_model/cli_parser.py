@@ -35,47 +35,12 @@ def cli_parser():
     --npp                : Boolean flag that, if present, instucts the emulator to use
                            NPP, rather than GPP and vegetation respiration separately.
 
-    --sotre_results      : Boolean flag that, if present, instucts the emulator to store
+    --store_results      : Boolean flag that, if present, instucts the emulator to store
                            the results from the emulation.
 
     """
     # Supported models
     model_list = {
-        # "CMIP6_1pctco2": [
-        #     "ACCESS-ESM1-5",
-        #     "BCC-CSM2-MR",
-        #     "CanESM5",
-        #     "CESM2",
-        #     "CMCC-ESM2",
-        #     "CNRM-ESM2-1",
-        #     "IPSL-CM6A-LR",
-        #     "MIROC-ES2L",
-        #     "MPI-ESM1-2-LR",
-        #     "MRI-ESM2-0",
-        #     "NorESM2-LM",
-        #     "UKESM1-0-LL",
-        # ],
-        # "CMIP6_1pctco2-cdr": [
-        #     "ACCESS-ESM1-5",
-        #     "CanESM5",
-        #     "CESM2",
-        #     "CNRM-ESM2-1",
-        #     "MIROC-ES2L",
-        #     "NorESM2-LM",
-        #     "UKESM1-0-LL",
-        # ],
-        # "CMIP6_ssp126": ["UKESM1-0-LL"],
-        # "CMIP6_ssp245": ["UKESM1-0-LL"],
-        # "CMIP6_ssp434": ["UKESM1-0-LL"],
-        # "CMIP6_ssp534-over": ["UKESM1-0-LL"],
-        # "CMIP6_ssp585": [
-        #     "UKESM1-0-LL",
-        #     "IPSL-CM6A-LR",
-        #     "MPI-ESM1-2-LR",
-        #     "MIROC-ES2L",
-        #     "MRI-ESM2-0",
-        # ],
-        # "CMIP6_historical": ["IPSL-CM6A-LR"],
         # These parameter values were trained using all avaiable SSPs for the model
         "CMIP6_cross_experiment": [
             "ACCESS-ESM1-5",
@@ -92,21 +57,6 @@ def cli_parser():
             "NorESM2-LM",
             "UKESM1-0-LL",
         ],
-        # "CMIP6_holistic": [
-        #     "UKESM1-0-LL",
-        #     "MPI-ESM1-2-LR",
-        #     "IPSL-CM6A-LR",
-        #     "MIROC-ES2L",
-        #     "NorESM2-LM",
-        #     "CanESM5",
-        #     "MRI-ESM2-0",
-        #     "CNRM-ESM2-1",
-        #     "CESM2",
-        #     "BCC-CSM2-MR",
-        #     "ACCESS-ESM1-5",
-        #     "CMCC-ESM2",
-        #     "GFDL-ESM4",
-        # ],
     }
     scenario_opts = [
         "abrupt-4xCO2",
@@ -120,11 +70,6 @@ def cli_parser():
         "ssp460",
         "ssp534-over",
         "ssp585",
-        # "manual-ssps",
-        # "manual-1pctco2",
-        # "historical",
-        # "cross_experiment",
-        # "holistic",
         "hist-noLu",
         "flat10",
         "esm-ssp370",
@@ -156,7 +101,13 @@ def cli_parser():
                 f"CMIP6 era and {args.scenario_pars} scenario. "
                 f"Available models are: {model_list["CMIP6_" + args.scenario_pars]}"
             )
-    # TODO: maybe have a table somewhere in git with all available models so I can just
-    # TODO: link to it?
 
-    return args.models, args.scenario, args.scenario_pars, args.realisation, args.save, args.npp, args.store_results
+    return (
+        args.models,
+        args.scenario,
+        args.scenario_pars,
+        args.realisation,
+        args.save,
+        args.npp,
+        args.store_results,
+    )
