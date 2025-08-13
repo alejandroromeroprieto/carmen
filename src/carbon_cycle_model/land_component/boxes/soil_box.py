@@ -14,7 +14,7 @@ from carbon_cycle_model import defaults
 class SoilBox(AbstractLandBox):
     """Soil box class."""
 
-    def __init__(self, num_steps, timestep, **kwargs):
+    def __init__(self, timestep, **kwargs):
         super().__init__(kwargs.get("csoil0", defaults.CSOIL0_DEFAULT))
         self.catm0 = kwargs.get("catm0", defaults.CATM0_DEFAULT)
         self.sres0 = kwargs.get("sres0", defaults.SRES0_DEFAULT)
@@ -33,23 +33,8 @@ class SoilBox(AbstractLandBox):
         self.sres_prev_fast_inertia = 0.0
         self.sres_prev_slow_inertia = 0.0
 
-        # gain_fast_cal = 1.0 / (1 - kwargs.get("sres_fast", 1))
-        # gain_fast_run = 1.0 / (1 - self.sres_fast_inertia)
-        # scaling_fast = gain_fast_cal / gain_fast_run
-        # self.sres_c_tan = kwargs.get("sres_c_tan") * scaling_fast
-
         self.sres_c_tan = kwargs.get("sres_c_tan")
         self.sres_c_tan2 = kwargs.get("sres_c_tan2", 0)
-
-        # if self.sres_slow_inertia == 1:
-        #     gain_slow_cal = 1.0  # no inertia effect
-        #     gain_slow_run = 1.0
-        # else:
-        #     gain_slow_cal = 1.0 / (1 - kwargs.get("sres_slow", 1))
-        #     gain_slow_run = 1.0 / (1 - self.sres_slow_inertia)
-        # scaling_slow = gain_slow_cal / gain_slow_run
-        # self.sres_c_tan2 = kwargs.get("sres_c_tan2", 0) * scaling_slow
-
 
     def get_sres(self, temp_ano, catm, hyst_signal_t):
         """
@@ -64,20 +49,13 @@ class SoilBox(AbstractLandBox):
                          (kelvin/celsius).
         """
 
+        # Calculate and store the inertia-associated factor recursively
         self.sres_prev_fast_inertia = (
             self.sres_fast_inertia * self.sres_prev_fast_inertia
             + (1 - self.sres_fast_inertia) * temp_ano
         )
-        self.sres_prev_slow_inertia = (
-            self.sres_slow_inertia * self.sres_prev_slow_inertia
-            + (1 - self.sres_slow_inertia) * temp_ano
-        )
 
-        f_inertia = (
-            1.0
-            + self.sres_c_tan * self.sres_prev_fast_inertia
-            + self.sres_c_tan2 * self.sres_prev_slow_inertia
-        )
+        f_inertia = 1.0 + self.sres_c_tan * self.sres_prev_fast_inertia
 
         return general_calibration_fun(
             self.sres0_par,
@@ -87,8 +65,6 @@ class SoilBox(AbstractLandBox):
             self.sres_c_half,
             self.sres_c_e,
             self.sres_hyst,
-            None,
-            None,
             None,
             None,
             self.stock - self.stock0,
