@@ -2,8 +2,9 @@
 Class implementing the land component of the carbon cycle.
 
 It includes two boxes: vegetation and soil. These boxes interact between them
-and with an abstract atmosphere box which is simply tracked as a number, the
+and with an abstract atmosphere box which is simply tracked as a number - the
 carbon dioxide concentration in the atmosphere.
+
 """
 
 import numpy as np
@@ -24,17 +25,21 @@ class LandCarbonCycle:
 
     This class stores as attributes the historical timeseries of:
     - cveg: carbon content in the vegetation pool.
-    - csoil: carbon concenten in the soil pool.
+    - csoil: carbon content in the soil pool.
     - gpp: gross primary production flux.
     - npp: net primary production flux.
     - vres: autotrophic respiration flux.
     - lit: litterfall flux.
     - sres: heterotrophic respiration flux.
-    - fcva: additional carbon flux from vegetation to atmosphere.
-    - fcsa: additional carbon flux from soil to atmosphere.
-    - fcvs: additional carbon flux from vegetation to soil.
+    - fcva: exogenous carbon flux from vegetation to atmosphere. This includes
+            any anthropogenic disturbances (e.g. fire, harvesting, etc...)
+    - fcsa: exogenous carbon flux from soil to atmosphere. This includes
+            any anthropogenic disturbances (e.g. fire, etc...)
+    - fcvs: exogenous carbon flux from vegetation to soil. This includes
+            any anthropogenic disturbances.
+
     as well as the following quantities:
-    - catm0: pre-industrial atmospheric concentration of carbon.
+    - catm0: pre-industrial atmospheric concentration of carbon (ppm).
     - dt: timestep size (years).
     - num_steps: number of steps the model will be run for.
     - peak_t: maximum experienced temperature anomaly by the model in this run.
@@ -43,8 +48,8 @@ class LandCarbonCycle:
 
     def __init__(self, dt, num_steps, **kwargs):
         # Create and initialise boxes
-        self.veg_box = VegetationBox(num_steps=num_steps, timestep=dt, **kwargs)
-        self.soil_box = SoilBox(num_steps=num_steps, timestep=dt, **kwargs)
+        self.veg_box = VegetationBox(timestep=dt, **kwargs)
+        self.soil_box = SoilBox(timestep=dt, **kwargs)
 
         # pre-industrial value for atmos CO2 conc. Units: ppm.
         self.catm0 = kwargs.get("catm0", defaults.CATM0_DEFAULT)
@@ -92,9 +97,6 @@ class LandCarbonCycle:
         fcva=0,
         fcsa=0,
         fcvs=0,
-        cveg_esm=None,
-        csoil_esm=None,
-        catm_esm=None,
     ):
         """Run the model one time step into the future.
 
@@ -102,16 +104,15 @@ class LandCarbonCycle:
         - temp_ano: current temperature difference from pre-industrial (Kelvin/celsius).
         - catm: atmospheric concentration of carbon dioxide (ppm).
         - npp_flag: whether to use the npp flux, or the GPP/vres fluxes.
-        - fcva: additional flux of carbon from vegetation to atmosphere.
-        - fcsa: additional flux of carbon from soil to atmosphere.
-        - fcvs: additional flux of carbon from vegetation to soil.
+        - fcva: exogenous flux of carbon from vegetation to atmosphere.
+        - fcsa: exogenous flux of carbon from soil to atmosphere.
+        - fcvs: exogenous flux of carbon from vegetation to soil.
 
         return values:
         - Increment of carbon stock in the vegetation pool.
         - Increment of carbon stock in the soil pool.
         """
-        # catm = catm_esm
-        # Update cumulative quantities
+        # Update temperature hysteresis factor
         self.peak_t = max(self.peak_t, temp_ano)
         hyst_signal_t = self.peak_t - temp_ano
 
@@ -127,29 +128,22 @@ class LandCarbonCycle:
 
         # Calculate new carbon stocks using an implicit euler scheme
         if npp_flag:
-            # cveg*(1.0+dt*(npp-lit) - dt*(fcva + fcvs)
-            # cvegnew = self.cveg[self.timestep_ind] * (
-            #     1.0 + self.dt * (npp - lit)
-            # ) - self.dt * (fcva + fcvs)
-            cvegnew = self.cveg[self.timestep_ind] * (
-                1.0 + self.dt * (0 - lit)
-            ) + self.dt * npp - self.dt * (fcva + fcvs)
+            cvegnew = (
+                self.cveg[self.timestep_ind] * (1.0 + self.dt * (0 - lit))
+                + self.dt * npp
+                - self.dt * (fcva + fcvs)
+            )
         else:
-            # cveg*(1.0+dt*(gpp - lit - vres)) - dt*(fcva + fcvs)
-            # cvegnew = self.cveg[self.timestep_ind] * (
-            #     1.0 + self.dt * (gpp - lit - vres)
-            # ) - self.dt * (fcva + fcvs)
-            cvegnew = self.cveg[self.timestep_ind] * (
-                1.0 + self.dt * (0 - lit - vres)
-            ) + self.dt*gpp - self.dt * (fcva + fcvs)
-        # cvegnew=cveg_esm
-        # csoil*(1.0-dt*sres) + gamma*dt*cveg + dt*(fcvs-fcsa)
+            cvegnew = (
+                self.cveg[self.timestep_ind] * (1.0 + self.dt * (0 - lit - vres))
+                + self.dt * gpp
+                - self.dt * (fcva + fcvs)
+            )
         csoilnew = (
             self.csoil[self.timestep_ind] * (1.0 - self.dt * sres)
             + lit * self.dt * cvegnew
             + self.dt * (fcvs - fcsa)
         )
-        # csoilnew=csoil_esm
 
         # Save new values
         self.veg_box.stock = self.cveg[self.timestep_ind + 1] = cvegnew
@@ -157,10 +151,8 @@ class LandCarbonCycle:
         self.lit[self.timestep_ind + 1] = lit * cvegnew
         self.sres[self.timestep_ind + 1] = sres * csoilnew
         if npp_flag:
-            # self.npp[self.timestep_ind + 1] = npp * cvegnew
             self.npp[self.timestep_ind + 1] = npp
         else:
-            # self.gpp[self.timestep_ind + 1] = gpp * cvegnew
             self.gpp[self.timestep_ind + 1] = gpp
             self.vres[self.timestep_ind + 1] = vres * cvegnew
             self.npp[self.timestep_ind + 1] = (
