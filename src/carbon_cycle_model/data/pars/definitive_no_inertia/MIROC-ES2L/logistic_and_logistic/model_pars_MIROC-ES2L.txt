@@ -1,1 +1,0 @@
-{"model": "MIROC-ES2L", "docn": 42.27958961, "docnfac": -3.67928324, "ocntemp": 0.01, "docntemp": 0.13014166}

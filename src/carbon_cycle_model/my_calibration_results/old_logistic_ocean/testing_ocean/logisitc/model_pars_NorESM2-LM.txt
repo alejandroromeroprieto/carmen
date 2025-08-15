@@ -1,1 +1,0 @@
-{"model": "NorESM2-LM", "docn": 42.31515981, "docnfac": 4.70007527, "ocntemp": 0.02783724, "docntemp": 0.14646682}
