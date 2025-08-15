@@ -1,6 +1,6 @@
 """
 File to store any auxiliary functions to the carbon cycle model that are not
-stored somehwere else.
+stored somewhere else.
 """
 
 import os

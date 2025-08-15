@@ -250,9 +250,6 @@ class CarbonCycle:
                 fcva=fcva_i[i],
                 fcsa=fcsa_i[i],
                 fcvs=fcvs_i[i],
-                cveg_esm=cveg_i[i],
-                csoil_esm=csoil_i[i],
-                catm_esm=ctam_i[i]
             )
 
             del_lnd = delta_cveg + delta_csoil

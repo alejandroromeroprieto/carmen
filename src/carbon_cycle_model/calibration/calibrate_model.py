@@ -709,7 +709,6 @@ for model, experiment_list in model_experiment_dict.items():
                 esm_data[model][realisation][experiment]["catm"][0],
                 esm_data[model][realisation][experiment]["dtglb"],
                 esm_data[model][realisation][experiment]["catm"],
-                testing=experiment
             )
 
             print(scc_lit[0] * esm_data[model][realisation][experiment]["cveg"][0], esm_data[model][realisation][experiment]["cveg"][0])
