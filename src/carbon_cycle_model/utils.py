@@ -1,6 +1,6 @@
 """
 File to store any auxiliary functions to the carbon cycle model that are not
-stored somewhere else.
+stored in specific folders.
 """
 
 import os
@@ -260,7 +260,6 @@ def load_esm_data(
     esm_data_file,
     recalc_emis=True,
     ocean_frac=OCEAN_FRAC,
-    ninit=1,
     smoothing_pars={"type": "butterworth", "pars": [1]},
 ):
     """
@@ -280,9 +279,6 @@ def load_esm_data(
                  is the HadCM3 ocean_frac. This value was actully used in calibration for
                  all models. ocean_frac is used to estimate the global mean ocean near
                  surface temperature from input Tglb and Tland.
-    ninit:       Integer, the number of initial time points (years) for establishing a
-                 temperature baseline againt which we define the anomalies of surface and
-                 ocean.
     smoothing_pars Scheme to use to smoothing the read in data. The variable must be a
                    dictionary with the type of algorithm to run (butterworth or savgol),
                    and the parameters necessary for that algorithm. The butterworth filter
