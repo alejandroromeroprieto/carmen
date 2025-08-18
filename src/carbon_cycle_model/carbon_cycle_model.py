@@ -1,7 +1,7 @@
 """
-Class emulating the carbon cycle, bringing together the land and ocean components. This
-file also implements a call to the cli_parser class to enable running the class through
-the cli.
+Parent class simulating the carbon cycle, bringing together the land and ocean
+components. This file also implements a call to the cli_parser class to enable
+running the class through the CLI.
 """
 
 import os
@@ -20,8 +20,6 @@ from carbon_cycle_model.ocean_component.ocean_component import OceanCarbonCycle
 from carbon_cycle_model.utils import Data, load_esm_data, make_all_dirs
 from carbon_cycle_model.constants import PPM2GT, PARS_DIR, SCEN_DIR, OUTPUT_DIR
 from carbon_cycle_model import defaults
-
-SPECIFIC_PARS_DIR = "my_calibration_results/ocean_sigmoid_depth_constant_gas_exchange" 
 
 class CarbonCycle:
     """
@@ -112,7 +110,7 @@ class CarbonCycle:
             # Right now we only have loaded cross_scenario par calibration, so that
             # is the only one we can load. We could relax this to load calibrations
             # for different scenarios, in which case we could use scenario-specic
-            # calirbations here
+            # calibrations here
             scenario_pars = "cross_experiment"
             if not scc_pars:
                 # Load calibrated SCC parameter from saved dict.
@@ -168,11 +166,6 @@ class CarbonCycle:
         self.esm_data = esm_data
         self.dtpred = dtpred
         self.dtoccmax = dtoccmax
-
-        # Only for run_one
-        # TODO: separate into two cases
-        # start = scc_pars.get("time0", defaults.TIME0_DEFAULT)
-        # self.time = np.arange(start, start + num_steps * dtpred, dtpred)
         self.time = time_cc
         self.current_step = 0
         self.npp_flag = npp_flag
@@ -199,10 +192,6 @@ class CarbonCycle:
         emis_i = np.interp(time_i, self.esm_data.time, self.esm_data.emis)
         dtocn_i = np.interp(time_i, self.esm_data.time, self.esm_data.dtocn)
         dtglb_i = np.interp(time_i, self.esm_data.time, self.esm_data.dtglb)
-        cveg_i = np.interp(time_i, self.esm_data.time, self.esm_data.cveg)
-        csoil_i = np.interp(time_i, self.esm_data.time, self.esm_data.csoil)
-        ctam_i = np.interp(time_i, self.esm_data.time, self.esm_data.catm)
-        cocean_i = np.interp(time_i, self.esm_data.time, self.esm_data.oflux)
 
         # Some quantities may or not be present. If they are not present
         # fill with zeros. These quantities are:
@@ -269,7 +258,6 @@ class CarbonCycle:
                 self.catm[i],
                 dtocn_i[i + 1],
             )
-            # delta_ocn = cocean_i[i]
 
             self.catm[i + 1] = self.catm[i] + (dt_ems - delta_ocn - del_lnd) / PPM2GT
             self.emis[i + 1] = emis_i[i]
@@ -361,7 +349,8 @@ class CarbonCycle:
         Create some diagnostic plots about the carbon cycle emulation.
 
         input:
-            -model: name of the model being simulated, so it can be added to plot titles.
+            - model: name of the model being simulated, so it can be added to plot titles.
+            - scenario: name of the scenario being simulated.
         """
 
         # Set font and size of plots
@@ -370,21 +359,6 @@ class CarbonCycle:
         plt.subplots_adjust(
             top=0.90, bottom=0.14, left=0.08, right=0.98, hspace=0.25, wspace=0.25
         )
-
-        # # # TODO: think about detrending better so we don't have to do this weird fix
-        # if model == "CNRM-ESM2-1" or model == "IPSL-CM6A-LR":
-
-        #     data_file = (
-        #         Path(__file__).parent / SCEN_DIR / f"sce_{model}_{scenario}.txt"
-        #     )
-
-        #     esm_data_not_detrended = load_esm_data(
-        #         data_file,
-        #         recalc_emis=True,
-        #         smoothing_pars={"type": "butterworth", "pars": [1]},
-        #     )
-
-        #     self.esm_data.catm = esm_data_not_detrended.catm
 
         # Simple diagnostic plot of emissions, and corresponding SCC catm predictions
         # (with GCM temperature).
@@ -449,163 +423,6 @@ class CarbonCycle:
         plt.plot(self.time, self.ocean.carbon_increase, label="cocn")
         plt.legend()
         plt.show()
-
-        # === Carbon fluxes subplot ===
-
-        # # Atmospheric carbon concentration
-        # ax = plt.subplot(2, 4, 1)
-        # plt.title("Title of")
-        # # Only attempt to print esm_data if it is present
-        # if all(field in self.esm_data.keys() for field in ["time", "catm"]):
-        #     plt.plot(
-        #         self.esm_data.time,
-        #         self.esm_data.catm,
-        #         color="orange",
-        #         alpha=0.5,
-        #         label="ESM",
-        #     )
-        # plt.plot(self.time, self.catm, color="dodgerblue", alpha=0.5, label="SCC")
-        # plt.title(model + ": Atm. CO2 concentration")
-
-        # # Carbon stock in the vegetation pool
-        # ax = plt.subplot(2, 4, 2)
-        # if all(field in self.esm_data.keys() for field in ["time", "cveg"]):
-        #     plt.plot(
-        #         self.esm_data.time,
-        #         self.esm_data.cveg,
-        #         color="orange",
-        #         alpha=0.5,
-        #         label="ESM",
-        #     )
-        # plt.plot(self.time, self.land.cveg, color="dodgerblue", alpha=0.5, label="SCC")
-        # plt.title(model + ": Vegetation carbon")
-
-        # # Carbon stock in the soil pool
-        # ax = plt.subplot(2, 4, 3)
-        # if all(field in self.esm_data.keys() for field in ["time", "csoil"]):
-        #     plt.plot(
-        #         self.esm_data.time,
-        #         self.esm_data.csoil,
-        #         color="orange",
-        #         alpha=0.5,
-        #         label="ESM",
-        #     )
-        # plt.plot(self.time, self.land.csoil, color="dodgerblue", alpha=0.5, label="SCC")
-        # plt.title(model + ": Soil carbon")
-
-        # # TCumulative carbon uptake by the ocean (Notice is not the total stock)
-        # ax = plt.subplot(2, 4, 4)
-        # if all(field in self.esm_data.keys() for field in ["time", "oflux"]):
-        #     plt.plot(
-        #         self.esm_data.time,
-        #         np.cumsum(self.esm_data.oflux),
-        #         color="orange",
-        #         alpha=0.5,
-        #         label="ESM",
-        #     )
-        # plt.plot(
-        #     self.time,
-        #     self.ocean.carbon_increase,
-        #     color="dodgerblue",
-        #     alpha=0.5,
-        #     label="SCC",
-        # )
-        # plt.title(model + ": Cum. ocean uptake")
-
-        # if not self.npp_flag:
-        #     # GPP flux
-        #     ax = plt.subplot(2, 4, 5)
-        #     if all(field in self.esm_data.keys() for field in ["time", "gpp"]):
-        #         plt.plot(
-        #             self.esm_data.time,
-        #             self.esm_data.gpp,
-        #             color="orange",
-        #             alpha=0.5,
-        #             label="ESM",
-        #         )
-        #     plt.plot(
-        #         self.time, self.land.gpp, color="dodgerblue", alpha=0.5, label="SCC"
-        #     )
-        #     plt.title(model + ": GPP")
-        #     plt.legend()
-
-        #     # Vegetation respiration flux
-        #     ax = plt.subplot(2, 4, 6)
-        #     if all(field in self.esm_data.keys() for field in ["time", "ra"]):
-        #         plt.plot(
-        #             self.esm_data.time,
-        #             self.esm_data.ra,
-        #             color="orange",
-        #             alpha=0.5,
-        #             label="ESM",
-        #         )
-        #     plt.plot(
-        #         self.time, self.land.vres, color="dodgerblue", alpha=0.5, label="SCC"
-        #     )
-        #     plt.title(model + ": Veg. respiration")
-        #     plt.legend()
-        # else:
-        #     # NPP flux
-        #     ax = plt.subplot(2, 4, 5)
-        #     if all(field in self.esm_data.keys() for field in ["time", "npp"]):
-        #         plt.plot(
-        #             self.esm_data.time,
-        #             self.esm_data.npp,
-        #             color="orange",
-        #             alpha=0.5,
-        #             label="ESM",
-        #         )
-        #     plt.plot(
-        #         self.time, self.land.npp, color="dodgerblue", alpha=0.5, label="SCC"
-        #     )
-        #     plt.title(model + ": NPP")
-        #     plt.legend()
-
-        #     # Carbon uptake by the ocean (positive into the ocean)
-        #     ax = plt.subplot(2, 4, 6)
-        #     if all(field in self.esm_data.keys() for field in ["time", "oflux"]):
-        #         plt.plot(
-        #             self.esm_data.time,
-        #             self.esm_data.oflux,
-        #             color="orange",
-        #             alpha=0.5,
-        #             label="ESM",
-        #         )
-        #     plt.plot(
-        #         self.time, self.ocean.oflux, color="dodgerblue", alpha=0.5, label="SCC"
-        #     )
-        #     plt.title(model + ": ocean uptake")
-        #     plt.legend()
-
-        # # Litterfall flux
-        # ax = plt.subplot(2, 4, 7)
-        # if all(field in self.esm_data.keys() for field in ["time", "lit"]):
-        #     plt.plot(
-        #         self.esm_data.time,
-        #         self.esm_data.lit,
-        #         color="orange",
-        #         alpha=0.5,
-        #         label="ESM",
-        #     )
-        # plt.plot(self.time, self.land.lit, color="dodgerblue", alpha=0.5, label="SCC")
-        # plt.title(model + ": Litterfall")
-        # plt.legend()
-
-        # # Soil respiration flux
-        # ax = plt.subplot(2, 4, 8)
-        # if all(field in self.esm_data.keys() for field in ["time", "rh"]):
-        #     plt.plot(
-        #         self.esm_data.time,
-        #         self.esm_data.rh,
-        #         color="orange",
-        #         alpha=0.5,
-        #         label="ESM",
-        #     )
-        # plt.plot(self.time, self.land.sres, color="dodgerblue", alpha=0.5, label="SCC")
-        # plt.title(model + ": soil respiration")
-        # plt.legend()
-
-        # plt.show()
 
         # Create the figure and axes
         fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(21, 10), sharex=True)
@@ -796,6 +613,8 @@ class CarbonCycle:
 
         ds.to_netcdf(out_file)
 
+        return 0
+
 
 def main():
     """ "
@@ -845,6 +664,7 @@ def main():
 
             pre_ind_algorithm = {"type": "average", "length": PRE_IND_AVERAGE_LENGTH}
 
+        # Some models perform better if smoothing is applied before computing the pre-industrial properties
         elif model in ["ACCESS-ESM1-5", "CanESM5", "CMCC-ESM2", "CNRM-ESM2-1"]:
             pre_ind_algorithm = {"type": "butterworth", "length": [10]}
 
@@ -888,22 +708,6 @@ def main():
         with open(pars_file, "r", encoding="utf-8") as infile:
             scc_pars = json.load(infile)
 
-        # # --- NEW: Load and apply specific parameter overrides ---
-        # specific_pars_file = (
-        #     Path(__file__).parent / SPECIFIC_PARS_DIR / f"model_pars_{model}.txt"
-        # )
-        # if specific_pars_file.exists():
-        #     print(f"Loading specific parameters from: {specific_pars_file}")
-        #     with open(specific_pars_file, "r", encoding="utf-8") as infile_specific:
-        #         specific_scc_pars = json.load(infile_specific)
-        #     # Use .update() to merge specific_scc_pars into scc_pars.
-        #     # Existing keys in scc_pars will be overwritten by values from specific_scc_pars.
-        #     scc_pars.update(specific_scc_pars)
-        #     print(f"Parameters for {model} updated with specific values.")
-        # else:
-        #     print(f"No specific parameter file found for {model} at {specific_pars_file}. Using general parameters.")
-        # # --- END NEW ---
-
         # Record pre-industrial values. Fluxes are an averaged over the
         # 0:ninit_scenario period (which depends on the scenario) and stocks
         # are simply the first value in the array. We do not take the average
@@ -942,9 +746,6 @@ def main():
         # Build the model and run it
         cc_emulator = CarbonCycle(esm_data, dtpred, dtoccmax, npp_flag, **scc_pars)
         cc_emulator.run_full_simulation()
-
-        # plt.plot(cc_emulator.ocean.oflux)
-        # plt.show()
 
         # Interpolate back to ESM time points, so we can compare results
         cc_emulator.interpolate_results(esm_data.time)
