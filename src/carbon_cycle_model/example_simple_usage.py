@@ -4,7 +4,7 @@ Example script on how to use the carbon cycle emulator.
 It does the following:
 - Initialise the emulator from one of the saved configurations.
 - Load data from the ESM corresponding to the loaded configuration.
-- Run the emulator via its single step function, as long as the ESM data extends.
+- Run the emulator via its single step function, as long as the ESM data extends for.
 - Interpolate results back to the yearly resolution of the ESM data.
 - Create some diagnostic plots about the results.
 """
@@ -81,6 +81,7 @@ for i in range(len(esm_data.time)):  # Assuming esm data is yearly
             "dtglb": esm_data.dtglb[i],
         }
 
+        # Add anthropogenic fluxes if they exist
         if isinstance(esm_data.fcvegout, np.ndarray):
             new_input.update({"fcva": esm_data.fcvegout[i]})
         if isinstance(esm_data.fcsoilout, np.ndarray):
@@ -88,7 +89,8 @@ for i in range(len(esm_data.time)):  # Assuming esm data is yearly
         if isinstance(esm_data.fcvegoutcsoilin, np.ndarray):
             new_input.update({"fcvs": esm_data.fcvegoutcsoilin[i]})
 
+        # Run model
         cc_emulator.run_one_step(new_input)
 
 cc_emulator.interpolate_results(esm_data.time)
-cc_emulator.create_plots(MODEL_NAME)
+cc_emulator.create_plots(MODEL_NAME, SCENARIO)
