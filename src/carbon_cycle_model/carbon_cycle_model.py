@@ -66,15 +66,6 @@ class CarbonCycle:
             if "scenario" in esm_data.keys():
                 scenario = esm_data.get("scenario", defaults.MODEL)
 
-                # If we are dealing with an SSP scenario, average the first few data
-                # points to denoise the first value. However, if dealing with a
-                # 1pctco2(-cdr) just take the first value, as subsequent values will
-                # already have significantly diverged from equilibrium.
-                if scenario in ["1pctco2", "1pctco2-cdr", "flat10"]:
-                    ninit_scenario = 1
-                else:
-                    ninit_scenario = 20
-
                 # Load diagnosed ESM data from the data dir
                 data_file = (
                     Path(__file__).parent / scen_to_use / f"sce_{model}_{scenario}.txt"
@@ -84,7 +75,6 @@ class CarbonCycle:
                 esm_data = load_esm_data(
                     data_file,
                     recalc_emis=True,
-                    ninit=ninit_scenario,
                     smoothing_pars={"type": "savgol", "pars": [21, 3]},
                 )
 
@@ -551,53 +541,62 @@ class CarbonCycle:
 
 
     def store_results(self, model, scenario, scc_pars, out_file):
+        """
+        Save simulation results to a file.
+
+        Input:
+            - model: name of the model we are emulating.
+            - scenario: name of the scenario we are emulating.
+            - scc_pars: dictionary with the model parameters used for the emulation.
+            - out_file: name of the file to store simulation data.
+        """
         data_vars = {
             # Atmospheric CO2
             'esm_catm': ('time', self.esm_data.catm),
             'simulated_catm': ('time', self.catm),
-            
+
             # Land box variables
             'esm_cveg': ('time', self.esm_data.cveg),
             'simulated_cveg': ('time', self.land.cveg),
-            
+
             'esm_csoil': ('time', self.esm_data.csoil),
             'simulated_csoil': ('time', self.land.csoil),
-            
+
             'esm_npp': ('time', self.esm_data.npp),
             'simulated_npp': ('time', self.land.npp),
-            
+
             'esm_lit': ('time', self.esm_data.lit),
             'simulated_lit': ('time', self.land.lit),
-            
+
             'esm_sres': ('time', self.esm_data.rh),
             'simulated_sres': ('time', self.land.sres),
-            
+
             'esm_fcva': ('time', self.land.fcva),
-            
+
             'esm_fcsa': ('time', self.land.fcsa),
-            
+
             'esm_fcvs': ('time', self.land.fcvs),
-            
+
             # Ocean box
             'esm_ocean_carbon_uptake': ('time', np.cumsum(self.esm_data.oflux)),
             'simulated_ocean_carbon_uptake': ('time', self.ocean.carbon_increase),
-            
+
             'esm_oflux': ('time', self.esm_data.oflux),
             'simulated_oflux': ('time', self.ocean.oflux),
-            
+
             # General carbon cycle boxy
             'esm_emissions': ('time', self.esm_data.gcmemis),
             'simulated_emissions': ('time', self.emis,),
         }
-        
+
         # Conditionally add gpp and vres
         if not self.npp_flag:
             data_vars['esm_gpp'] = ('time', self.esm_data.gpp)
             data_vars['simulated_gpp'] = ('time', self.land.gpp)
-            
+
             data_vars['esm_vres'] = ('time', self.esm_data.ra)
             data_vars['simulated_vres'] = ('time', self.land.vres)
-        
+
         # Create Dataset
         ds = xr.Dataset(
             data_vars,
@@ -611,6 +610,7 @@ class CarbonCycle:
         ds.attrs['scenario'] = scenario
         ds.attrs['model_pars'] = json.dumps(scc_pars)
 
+        print(f"Saving results to {out_file}")
         ds.to_netcdf(out_file)
 
         return 0
@@ -652,17 +652,17 @@ def main():
         # How to derive pre-industrial values
         if model in ["BCC-CSM2-MR", "CESM2", "GFDL-ESM4", "IPSL-CM6A-LR", "MIROC-ES2L", "MPI-ESM1-2-LR", "MRI-ESM2-0", "NorESM2-LM", "UKESM1-0-LL"]:
             if "1pctco2" in scenario:
-                PRE_IND_AVERAGE_LENGTH = 1
+                pre_ind_average_length = 1
             elif "ssp" in scenario or "hist" in scenario:
-                PRE_IND_AVERAGE_LENGTH = 20
+                pre_ind_average_length = 20
             elif "abrupt" in scenario:
-                PRE_IND_AVERAGE_LENGTH = 1
+                pre_ind_average_length = 1
             elif "flat" in scenario:
-                PRE_IND_AVERAGE_LENGTH = 1
+                pre_ind_average_length = 1
             else:
                 raise ValueError(f"Experiment {scenario} not recognised")
 
-            pre_ind_algorithm = {"type": "average", "length": PRE_IND_AVERAGE_LENGTH}
+            pre_ind_algorithm = {"type": "average", "length": pre_ind_average_length}
 
         # Some models perform better if smoothing is applied before computing the pre-industrial properties
         elif model in ["ACCESS-ESM1-5", "CanESM5", "CMCC-ESM2", "CNRM-ESM2-1"]:
@@ -757,8 +757,8 @@ def main():
 
         # Store results
         if store_flag:
-            CWD = str(Path.cwd())
-            out_file = os.path.join(CWD, OUTPUT_DIR)
+            cwd = str(Path.cwd())
+            out_file = os.path.join(cwd, OUTPUT_DIR)
             out_file += f"/simulation_{model}_{scenario}.nc"
             make_all_dirs(out_file)
 
