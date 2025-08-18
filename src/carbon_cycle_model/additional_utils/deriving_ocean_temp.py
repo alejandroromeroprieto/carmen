@@ -40,7 +40,7 @@ if model_to_fit == "CNRM-ESM2-1" or model_to_fit == "IPSL-CM6A-LR":
 else:
     scen_to_use = SCEN_DIR
 
-data_dir = Path(__file__).parent / scen_to_use
+data_dir = Path(__file__).parent.parent / scen_to_use
 
 data_files = list_files_containing(data_dir, model_to_fit)
 
@@ -56,7 +56,6 @@ for data_file in data_files:
     esm_data = load_esm_data(
         data_dir / data_file,
         recalc_emis=True,
-        ninit=20,  # Because it's an SSP scenario
         smoothing_pars={"type": "butterworth", "pars": [1]},  # no smoothing
     )
 
@@ -73,15 +72,8 @@ for data_file in data_files:
 general_temperature_list = []
 ocean_temperature_list = []
 for scenario, vals in data_dict.items():
-    # plt.scatter(vals["general_temperature"], vals["ocean_temperature"], label=scenario)
     general_temperature_list.append(vals["general_temperature"])
     ocean_temperature_list.append(vals["ocean_temperature"])
-
-# plt.legend()
-# plt.show()
-
-# plt.scatter(general_temperature_list, ocean_temperature_list)
-# plt.show()
 
 # Convert to NumPy arrays and flatten them
 general_temperature_array = np.concatenate(general_temperature_list).ravel()
