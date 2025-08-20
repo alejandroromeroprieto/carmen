@@ -8,6 +8,10 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
+    # bayesian stuff
+    #emcee
+    #tqdm
+    #corner
 ]
 
 [build-system]
