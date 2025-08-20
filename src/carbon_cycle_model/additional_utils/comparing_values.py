@@ -1,67 +1,9 @@
-# NOTE: THIS IS JUST SOME MESSY, AUXILIARY CODE THAT ALEX ROMERO PRIETO WROTE TO CREATE SOME PLOTS TO COMPARE PARAMETER VALUES
-# IT IS NOT CONSIDERED PART OF THE MODEL, AND PRESENTED "AS IS" IN CASE IT IS USEFUL IN THE FUTURE, AND FOR ARCHIVE PURPOSES.
-
-# import json
-# import pandas as pd
-# import matplotlib.pyplot as plt
-# import seaborn as sns
-
-# # Define file paths
-# file_paths = [
-#     "/home/eearp/code/carbon-cycle-model/src/carbon_cycle_model/my_calibration_results/UKESM-all-ssps_default/model_pars_UKESM1-0-LL.txt",
-#     "/home/eearp/code/carbon-cycle-model/src/carbon_cycle_model/my_calibration_results/UKESM-all-ssps_r2i1p1f2/model_pars_UKESM1-0-LL.txt",
-#     "/home/eearp/code/carbon-cycle-model/src/carbon_cycle_model/my_calibration_results/UKESM-all-ssps_r3i1p1f2/model_pars_UKESM1-0-LL.txt",
-#     "/home/eearp/code/carbon-cycle-model/src/carbon_cycle_model/my_calibration_results/UKESM-all-ssps_r4i1p1f2/model_pars_UKESM1-0-LL.txt"
-# ]
-
-# # Load JSON data
-# data = []
-# for file in file_paths:
-#     with open(file, "r") as f:
-#         content = json.load(f)
-#         data.append(content)
-
-# # Convert to DataFrame
-# df = pd.DataFrame(data)
-
-# # Set index to model names
-# df_numeric = df.set_index('model')
-
-# # Compute the mean and standard deviation for normalization
-# mean_values = df_numeric.mean()
-# std_values = df_numeric.std()
-
-# # Normalize data (z-score: (X - mean) / std)
-# df_normalized = (df_numeric - mean_values) / std_values
-
-# # Add a new row with the mean values at the bottom
-# df_with_avg = df_normalized.copy()
-# df_with_avg.loc["Average"] = mean_values
-# df_with_avg.loc["Std"] = std_values
-
-# # Exclude "Average" row from heatmap normalization
-# df_heatmap = df_with_avg.iloc[:-2]  # Remove the last row before plotting
-
-# # Plot heatmap
-# plt.figure(figsize=(12, 6))
-# sns.heatmap(df_heatmap.T, annot=True, cmap="coolwarm", center=0, linewidths=0.5)
-
-# # Add a table below the heatmap to show the average values
-# plt.title("Heatmap of Variable Differences from the Mean (Z-score)")
-# plt.xlabel("Model")
-# plt.ylabel("Variables")
-
-# # Display the average row separately
-# df_avg_display = df_with_avg.loc[["Average"]].T  # Transpose for table format
-# plt.table(cellText=df_avg_display.values,
-#           rowLabels=df_avg_display.index,
-#           colLabels=df_avg_display.columns,
-#           cellLoc="center",
-#           loc="bottom")
-
-# plt.subplots_adjust(left=0.2, bottom=0.3)  # Adjust layout to fit the table
-# plt.show()
-
+"""
+This is just a messy script originally employed by Alex Romero Prieto to create some plots comparing different parameter
+values. It is not condidere as part of the model code, and as such it is presented "as is" without the same level of 
+clarity and comments as the model code. It is left here for archiving purposes and in case it is useful in the future, but
+it can be safely ignored.
+"""
 
 import json
 import pandas as pd
