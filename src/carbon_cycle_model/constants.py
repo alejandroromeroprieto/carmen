@@ -5,7 +5,7 @@ List of physical and model constants.
 # Paths
 PARS_DIR = "data/pars/definitive"
 SCEN_DIR = "data/scenarios"
-OUTPUT_DIR = "output/"
+OUTPUT_DIR = "output"
 
 GAS_EXCHANGE_COEF = 0.1306  # for the carbon exchange between atmosphere and OML
 KELVIN_0 = 273.15  # 0 degrees celsius in kelvin
