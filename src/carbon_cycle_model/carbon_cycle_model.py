@@ -738,7 +738,9 @@ def main():
             scc_pars["sres0"] = esm_input_smoothed.rh[0]
             scc_pars["vres0"] = esm_input_smoothed.ra[0]
         else:
-            raise ValueError(f"Pre-industrial algorithm {pre_ind_algorithm["type"]} not recognised.")
+            raise ValueError(
+                f"Pre-industrial algorithm {pre_ind_algorithm['type']} not recognised."
+            )
 
         # Measure the time it takes us to run the model
         tbeg = systime.time()
