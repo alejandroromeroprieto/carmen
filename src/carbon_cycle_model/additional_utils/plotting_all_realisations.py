@@ -1,8 +1,9 @@
-# NOTE: THIS IS JUST SOME MESSY, AUXILIARY CODE THAT ALEX ROMERO PRIETO WROTE TO CREATE SOME PLOTS TO COMPARE PARAMETER VALUES
-# FROM DIFFERENT REALISATIONS FOR THE SAME MODEL (UKESM1-0-LL).
-# IT IS NOT CONSIDERED PART OF THE MODEL, AND PRESENTED "AS IS" IN CASE IT IS USEFUL IN THE FUTURE, AND FOR ARCHIVE PURPOSES.
 """
-Just testing with different realisations/
+This is just a messy script originally employed by Alex Romero Prieto to create some
+plots comparing different realisations. It is not condidere as part of the model code,
+and as such it is presented "as is" without the same level of  clarity and comments as
+the model code. It is left here for archiving purposes and in case it is useful in the
+future, but it can be safely ignored.
 """
 
 import json
@@ -45,12 +46,12 @@ for realisation in realisations:
 
     if realisation == "default":
         data_file = (
-            Path(__file__).parent / scen_to_use / f"sce_{MODEL_NAME}_{SCENARIO}.txt"
+            Path(__file__).parent.parent / scen_to_use / f"sce_{MODEL_NAME}_{SCENARIO}.txt"
         )
         print("\nLoading ESM data from: ", data_file)
     else:
         data_file = (
-            Path(__file__).parent
+            Path(__file__).parent.parent
             / scen_to_use
             / "other_realisations"
             / f"sce_{MODEL_NAME}_{SCENARIO}_{realisation}.txt"
@@ -60,14 +61,13 @@ for realisation in realisations:
     esm_data = load_esm_data(
         data_file,
         recalc_emis=True,
-        ninit=20,  # Because it's an SSP scenario
         smoothing_pars={"type": "savgol", "pars": [21, 3]},
     )
     esm_data_dict.update({realisation: esm_data})
 
 
 pars_file = (
-    Path(__file__).parent / pars_to_use / f"sccpar_{MODEL_NAME}_cross_experiment.txt"
+    Path(__file__).parent.parent / pars_to_use / f"sccpar_{MODEL_NAME}_cross_experiment.txt"
 )
 print("Loading SCC parameters from: ", pars_file)
 

@@ -1,11 +1,14 @@
-# NOTE: THIS IS JUST SOME MESSY, AUXILIARY CODE THAT ALEX ROMERO PRIETO WROTE TO CREATE SOME PLOTS TO COMPARE PARAMETER VALUES
-# IT IS NOT CONSIDERED PART OF THE MODEL, AND PRESENTED "AS IS" IN CASE IT IS USEFUL IN THE FUTURE, AND FOR ARCHIVE PURPOSES.
+"""
+This is just a messy script originally employed by Alex Romero Prieto to create some plots comparing different parameter
+values. It is not condidere as part of the model code, and as such it is presented "as is" without the same level of 
+clarity and comments as the model code. It is left here for archiving purposes and in case it is useful in the future, but
+it can be safely ignored.
+"""
 
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
 
 
 # Define file paths
@@ -33,8 +36,6 @@ for file in file_paths_others:
 # Convert to DataFrame
 df_others = pd.DataFrame(data_others)
 
-import seaborn as sns
-
 magnitude_vars = []
 # Separate variables into two groups
 # magnitude_vars = [col for col in df_others.columns if "_t_l" in col]
@@ -45,7 +46,6 @@ magnitude_vars = []
 magnitude_vars = ["docntemp"]
 
 # plot: 1pctco2, hist, hist-noLU, is hist-noLU closer to 1pctco2 or hist
-
 marker_size = 200
 
 # Create figure
