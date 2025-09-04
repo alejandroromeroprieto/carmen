@@ -16,7 +16,7 @@ Once inside an environemnt with the required python libraries (see section below
   
 
 - Through the CLI tool: CARMEN implements a CLI tool to run the model interactively. From the base folder simply run: `PYTHONPATH=src python -m carmen.carmen <model> --scenario <scenario> --npp`, where `<model>` and `<scenario>` are the ESM and scenario you would like to emulate. For instance, `PYTHONPATH=src python -m carmen.carmen UKESM1-0-LL --scenario ssp434 --npp` will run an emulation of the carbon cycle from UKESM1-0-LL for the ssp434 scenario, and plot the results comparing CARMEN's emulation and the underlying ESM data.
-- Programmatically: CARMEN has been designed to be easy to couple to other models. The only two external quantities it requires are annual global air temperature and annual global ocean temperature. The `src/carmen/example_simple_usage.py` script presents a minimalist example on how CARMEN can be used programmatically. 
+- Programmatically: CARMEN has been designed to be easy to couple to other models. The only two external quantities it requires are annual global air temperature and annual global ocean temperature. The `examples/example_simple_usage.py` script presents a minimalist example on how CARMEN can be used programmatically. 
 
 # Calibration
 
@@ -33,7 +33,7 @@ The main folders in the repository are:
 
 - Model code: this lives under the `land_component` and `ocean_component` folders in `src/carmen/`. The `CarbonCycle` class providing CARMEN's interface and bringing the two components together lives in `src/carmen/carmen.py`.
 - Calibration code: you can find all utils related to the calibration of CARMEN under `src/carmen/calibration`. 
-- Example usage: you can find an example of how CARMEN can be imported and run programmatically in `src/carmen/example_simple_usage.py`
+- Example usage: you can find an example of how CARMEN can be imported and run programmatically in `examples/example_simple_usage.py`
 - Data: the `src/carmen/data` stores both annual ESM data used for CARMEN's calibration and the parameters resulting from that calibration.
 - Plotting tools: the `src/carmen/plotting` folder stores some useful utils for plotting several metrics associated with CARMEN's emulation.
 - Output: the `output` folder stores simulation data and plots from CARMEN's emulations, which are produced by various tools within the repository.
