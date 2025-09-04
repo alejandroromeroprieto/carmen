@@ -1,6 +1,6 @@
 [project]
 name = "carmen"
-version = "0.1.0"
+version = "0.0.0"
 description = ""
 authors = [
     {name = "Alejandro Romero Prieto", email = "eearp@leeds.ac.uk"}
@@ -21,4 +21,8 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 pylint = "^3.3.8"
+poetry-dynamic-versioning = "^1.9.1"
+
+[tool.poetry-dynamic-versioning]
+enable = true
 
