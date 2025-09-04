@@ -1,0 +1,28 @@
+[project]
+name = "carmen"
+version = "0.0.0"
+description = ""
+authors = [
+    {name = "Alejandro Romero Prieto", email = "eearp@leeds.ac.uk"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<4"
+dependencies = [
+    "matplotlib (>=3.10.6,<4.0.0)",
+    "xarray (>=2025.9.0,<2026.0.0)",
+    "scipy (>=1.16.1,<2.0.0)",
+    "numpy (>=2.3.2,<3.0.0)",
+    "optimparallel (>=0.1.3,<0.2.0)"
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+pylint = "^3.3.8"
+poetry-dynamic-versioning = "^1.9.1"
+
+[tool.poetry-dynamic-versioning]
+enable = true
+
