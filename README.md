@@ -106,3 +106,37 @@ The main folders in the repository are:
 - Data: the `src/carmen/data` stores both annual ESM data used for CARMEN's calibration and the parameters resulting from that calibration.
 - Plotting tools: the `src/carmen/plotting` folder stores some useful utils for plotting several metrics associated with CARMEN's emulation.
 - Output: the `output` folder stores simulation data and plots from CARMEN's emulations, which are produced by various tools within the repository.
+
+# Versioning
+This project uses Git-based dynamic versioning via the poetry-dynamic-versioning plugin. This ensures that the version of the package always reflects the latest Git tag.
+
+How it works
+
+- The version is automatically determined from Git tags (e.g., v0.1.0).
+
+- If there are commits after the latest tag, the version will include a .devN+gHASH suffix, e.g., 0.1.0.dev3+g7a9b2c.
+
+- You can access the version in Python:
+
+```
+import carmen
+print(carmen.__version__)
+```
+
+Adding a new release:
+
+1. Tag the commit in Git with the new version:
+
+```
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+2. Build or install the package:
+
+```
+poetry build
+poetry install
+```
+
+The dynamic version will now reflect the new tag. No need to manually update the version in `pyproject.toml`.
