@@ -2,4 +2,4 @@
 __pycache__/
 *.py[cod]
 *$py.class
-src/carbon_cycle_model/my_calibration_results/
+src/carmen/my_calibration_results/
