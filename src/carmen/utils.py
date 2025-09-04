@@ -7,6 +7,7 @@ import os
 
 import numpy as np
 import scipy
+from scipy.integrate import cumulative_trapezoid
 from scipy.signal import savgol_filter
 
 from carmen.constants import KELVIN_0, OCEAN_FRAC, PPM2GT
@@ -65,7 +66,7 @@ def calc_emissions(
     """
     # This is a cumulative integral calculating the total historical carbon uptake by the
     # ocean at each timestep
-    cocn = scipy.integrate.cumtrapz(oflux, x=time, initial=0.0)
+    cocn = cumulative_trapezoid(oflux, x=time, initial=0.0)
     ctot = catm * PPM2GT + cveg + csoil + cocn
 
     # Implied emissions are the derivative of the difference.

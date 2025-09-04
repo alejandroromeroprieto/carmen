@@ -99,7 +99,7 @@ def cli_parser():
             raise ValueError(
                 f"Wrong model name '{model}' for "
                 f"CMIP6 era and {args.scenario_pars} scenario. "
-                f"Available models are: {model_list["CMIP6_" + args.scenario_pars]}"
+                f"Available models are: {model_list['CMIP6_' + args.scenario_pars]}"
             )
 
     return (

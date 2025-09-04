@@ -15,7 +15,7 @@ Once inside an environemnt with the required python libraries (see section below
 
   
 
-- Through the CLI tool: CARMEN implements a CLI tool to run the model interactively. From the base folder simply run: `PYTHONPATH=src python -m carmen.carmen <model> --scenario <scenario> --npp`, where `<model>` and `<scenario>` are the ESM and scenario you would like to emulate. For instance, `PYTHONPATH=src python -m carmen.carmen UKESM1-0-LL --scenario ssp434 --npp` will run an emulation of the carbon cycle from UKESM1-0-LL for the ssp434 scenario, and plot the results comparing CARMEN's emulation and the underlying ESM data.
+- Through the CLI tool: CARMEN implements a CLI tool to run the model interactively. From the base folder simply run: `PYTHONPATH=src poetry run python -m carmen.carmen <model> --scenario <scenario> --npp`, where `<model>` and `<scenario>` are the ESM and scenario you would like to emulate. For instance, `PYTHONPATH=src poetry run python -m carmen.carmen UKESM1-0-LL --scenario ssp434 --npp` will run an emulation of the carbon cycle from UKESM1-0-LL for the ssp434 scenario, and plot the results comparing CARMEN's emulation and the underlying ESM data.
 - Programmatically: CARMEN has been designed to be easy to couple to other models. The only two external quantities it requires are annual global air temperature and annual global ocean temperature. The `examples/example_simple_usage.py` script presents a minimalist example on how CARMEN can be used programmatically. 
 
 # Calibration
@@ -24,8 +24,77 @@ To produce new parametrisations aiming to emulate different ESMs, the `src/carme
   
 
 # Required environment
-TODO: I have created some conda environment to run the model, but I need to wrtie down the requirements. 
-  
+This project uses Poetry for dependency management and can be run inside a conda environment for reproducibility.
+
+1. Create and activate a conda environment
+
+Choose a Python version that satisfies the project requirements (see pyproject.toml, currently >=3.10,<4):
+
+```
+conda create --name carmen python=3.10
+conda activate carmen
+```
+
+2. Install Poetry (if not already installed)
+
+If Poetry is not available on your system:
+
+```
+pip install poetry
+```
+
+3. Link Poetry to the conda environment
+
+Tell Poetry to use the Python from the active conda environment:
+
+```
+poetry env use $(which python)
+```
+
+You can verify with:
+
+```
+poetry env info
+```
+
+The Path: should point to your conda environment.
+
+4. Install project dependencies
+
+Install all required packages as defined in pyproject.toml:
+
+```
+poetry install
+```
+
+5. Run the model
+
+Always use poetry run to ensure the correct environment is used:
+
+```
+PYTHONPATH=src poetry run python -m carmen.carmen <model_name> --scenario <scenario_name> [options]
+```
+
+Notes:
+
+If you need to add new packages during development, use:
+
+```
+poetry add <package_name>
+```
+
+For development tools (e.g., pytest, black), use:
+
+```
+poetry add --group dev <package_name>
+```
+
+To update all dependencies:
+
+```
+poetry update
+```
+
 
 # Repository structure
 
