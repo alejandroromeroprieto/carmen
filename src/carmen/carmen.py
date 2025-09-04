@@ -416,7 +416,7 @@ class CarbonCycle:
 
         # Create the figure and axes
         fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(21, 10), sharex=True)
-        fig.suptitle(f"CARMEN emulation of {model} carbon cycle", fontsize=30)
+        fig.suptitle(f"CARMEN emulation of {model} carbon cycle for {scenario}", fontsize=30)
 
         # Flatten axes for easier access
         axes = axes.flatten()
